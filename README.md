@@ -2,11 +2,8 @@
 
 Um player web inspirado em rádios automotivos clássicos. O projeto une a aparência de um painel físico — metal, LEDs, botões com profundidade e tela digital — ao controle da conta Spotify do visitante.
 
-## Acesse
 
-Após a publicação no GitHub Pages, o endereço do projeto é:
 
-`https://mateusfrmacedo.github.io/radiocar/`
 
 ## Recursos
 
@@ -43,37 +40,4 @@ O controle completo de reprodução no navegador usa o Spotify Web Playback SDK.
 
 O projeto utiliza OAuth com PKCE. O identificador público do aplicativo Spotify fica no código, mas o `client secret` nunca deve ser colocado em arquivos publicados ou no navegador.
 
-No painel do aplicativo em [Spotify for Developers](https://developer.spotify.com/dashboard), cadastre estes redirecionamentos:
 
-```text
-http://127.0.0.1:5173/
-https://mateusfrmacedo.github.io/radiocar/
-```
-
-Para liberar o projeto para pessoas além dos usuários de teste, solicite a extensão de quota no painel do Spotify e cumpra os requisitos de produção da plataforma.
-
-## Desenvolvimento local
-
-Abra a pasta do projeto e inicie um servidor HTTP:
-
-```bash
-python3 -m http.server 5173 --bind 127.0.0.1
-```
-
-Depois, acesse `http://127.0.0.1:5173/`. Não use o endereço `file://` para conectar ao Spotify, porque o OAuth exige uma URL HTTP/HTTPS cadastrada.
-
-## Estrutura
-
-```text
-index.html          interface, controles e integração Spotify
-style.css           aparência responsiva e efeitos visuais
-animação.MP4       animação reproduzida no LCD ao iniciar
-```
-
-## Publicação
-
-O site é estático e pode ser servido diretamente pelo GitHub Pages a partir da branch `main` e da pasta raiz (`/`). Depois de um novo commit, o GitHub Pages pode levar alguns minutos para atualizar.
-
-## Privacidade
-
-Os tokens de acesso necessários para a sessão do Spotify ficam somente no armazenamento local do navegador do visitante. O RadioCar não possui servidor próprio nem armazena dados de contas musicais.
