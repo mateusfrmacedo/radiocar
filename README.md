@@ -4,8 +4,6 @@
 
 Um player web inspirado em rádios automotivos clássicos. O projeto une a aparência de um painel físico — metal, LEDs, botões com profundidade e tela digital — ao controle da conta Spotify do visitante.
 
-## Recursos
-
 - Visual skeuomórfico de rádio automotivo, com sombras, relevo e resposta de botão pressionado.
 - Tela LCD com fonte de estética digital e animação de inicialização.
 - Controle de volume pelo grande botão rotativo, inclusive com arrastar vertical em telas sensíveis ao toque.
@@ -16,10 +14,7 @@ Um player web inspirado em rádios automotivos clássicos. O projeto une a apar�
 - Modo minimalista: o botão físico do Spotify oculta ou reabre a biblioteca de playlists e faixas.
 - Alternância entre acabamento escuro e claro.
 
-## Requisitos do Spotify
-
 O controle completo de reprodução no navegador usa o Spotify Web Playback SDK. Por isso, a conta conectada precisa ter **Spotify Premium**. 
-
 O projeto utiliza OAuth com PKCE
 
 
