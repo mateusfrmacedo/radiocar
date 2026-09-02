@@ -103,7 +103,7 @@ body {
 
 .r2 { overflow:hidden; height:22px; flex-shrink:0; }
 .title { font-family:"VT323",monospace; font-size:21px; line-height:22px; color:#ff2200; text-shadow:0 0 7px rgba(255,34,0,0.8),0 0 14px rgba(255,34,0,0.3); white-space:nowrap; display:inline-block; letter-spacing:1px; }
-.title.scroll { animation:mq 22s linear infinite; }
+.title.scroll { animation:mq 28s linear infinite; }
 @keyframes mq { 0%,12%{transform:translateX(0)} 88%,100%{transform:translateX(-50%)} }
 
 .r3 { font-family:"VT323",monospace; font-size:12px; line-height:12px; flex-shrink:0; color:#7a2a2a; letter-spacing:2px; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -218,6 +218,10 @@ body.light { background: radial-gradient(circle at 50% 15%, #fff 0, #e9e9e9 48%,
 .radio-wrapper::after { content:""; position:absolute; inset:0; pointer-events:none; border-radius:7px; background:linear-gradient(112deg,rgba(255,255,255,.09),transparent 18%,transparent 76%,rgba(0,0,0,.3)); mix-blend-mode:screen; }
 .lcd { box-shadow: inset 0 1px 5px #000, inset 0 0 18px rgba(210,10,0,.16), 0 0 5px rgba(255,38,0,.18); }
 .lcd-inner { text-shadow:0 0 1px currentColor; }
+/* Reserve fixed vertical lanes for the status, title and timeline.  DSEG has
+   tall glyphs, so a grid prevents its ascenders from being clipped. */
+.lcd:not(.volume-active) .lcd-inner { display:grid; grid-template-rows:15% 53% 0 32% 0; height:100%; }
+.lcd:not(.volume-active) .r1,.lcd:not(.volume-active) .r2,.lcd:not(.volume-active) .r3,.lcd:not(.volume-active) .r4 { height:auto; }
 .lcd .title,.lcd .r3,.lcd .lbl,.lcd .ico,.lcd .time-row,.lcd .vol-lbl,.lcd .vol-num { font-family:"DSEG14 Classic",monospace; }
 .lcd .icons { position:absolute; top:.58cqw; right:1.05cqw; display:flex; gap:.55cqw; z-index:12; }
 .lcd .ico { color:#a52a1b; opacity:.8; font-size:1cqw; }
@@ -226,9 +230,8 @@ body.light { background: radial-gradient(circle at 50% 15%, #fff 0, #e9e9e9 48%,
 .lcd .time-row .prog-track { min-width:0; }
 .lcd #tCur,.lcd #tTot { display:block; overflow:visible; opacity:1; }
 .lcd #tTot { position:absolute; right:0; top:50%; color:#e4311c; min-width:3.7cqw; transform:translateY(-50%); text-align:right; text-shadow:0 0 5px rgba(255,40,15,.45); }
-.r2 { overflow:visible; justify-content:center; }
-.title { position:relative; top:.78cqw; letter-spacing:1.4px; }
-.lcd:not(.volume-active) .lcd-inner { grid-template-rows:14% 44% 0% 42% 0%; }
+.r2 { overflow:hidden; justify-content:center; align-items:end; }
+.title { position:relative; top:0; font-size:2.9cqw; line-height:1; letter-spacing:1.4px; }
 .lcd:not(.volume-active) .r5 { opacity:0; visibility:hidden; pointer-events:none; }
 .lcd.volume-active .lcd-inner { display:flex; align-items:center; justify-content:center; }
 .lcd.volume-active .r1,.lcd.volume-active .r2,.lcd.volume-active .r3,.lcd.volume-active .r4 { display:none; }
