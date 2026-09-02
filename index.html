@@ -18,8 +18,16 @@
   </button>
   <div class="settings-popup" role="dialog" aria-label="Configurações de aparência">
     <button class="settings-theme" type="button" onclick="toggleBg()"><strong id="settingsTheme">DARK</strong></button>
+    <div class="settings-scale">
+      <span>SIZE</span>
+      <div class="scale-controls">
+        <button type="button" onclick="adjustPlayerScale(-.05)" aria-label="Diminuir interface">−</button>
+        <output id="scaleValue" aria-live="polite">100%</output>
+        <button type="button" onclick="adjustPlayerScale(.05)" aria-label="Aumentar interface">+</button>
+      </div>
+    </div>
     <div class="settings-colors">
-      <span>COR</span>
+      <span>COLOR</span>
       <div class="settings-dots">
         <button class="accent-dot red" type="button" onclick="setAccent('red')" aria-label="Vermelho"></button>
         <button class="accent-dot blue" type="button" onclick="setAccent('blue')" aria-label="Azul"></button>
@@ -135,6 +143,7 @@
 
 <script>
 let isLight=false;
+let infoClockTimer=null,infoRestoreTimer=null;
 function toggleBg(){
   isLight=!isLight;
   const b=document.getElementById("body"),label=document.getElementById("settingsTheme");
@@ -144,6 +153,9 @@ function toggleBg(){
 
 function toggleSettings(){const menu=document.getElementById("settingsMenu"),trigger=menu.querySelector(".settings-trigger"),open=menu.classList.toggle("open");trigger.setAttribute("aria-expanded",String(open));}
 function openSpotifyControl(){if(!token){connectSpotify();return;}toggleLibrary(false);document.getElementById("plPanel").scrollIntoView({behavior:"smooth",block:"center"});}
+let playerScale=Number(localStorage.getItem("radiocar-scale"))||1;
+function applyPlayerScale(){document.documentElement.style.setProperty("--player-scale",playerScale);document.getElementById("scaleValue").textContent=`${Math.round(playerScale*100)}%`;}
+function adjustPlayerScale(delta){playerScale=Math.max(.75,Math.min(1.15,Math.round((playerScale+delta)*100)/100));localStorage.setItem("radiocar-scale",playerScale);applyPlayerScale();}
 function setAccent(color){
   document.body.dataset.accent=color;
   localStorage.setItem("radiocar-accent",color);
@@ -152,6 +164,7 @@ function setAccent(color){
   document.querySelector(".settings-trigger").setAttribute("aria-expanded","false");
 }
 setAccent(localStorage.getItem("radiocar-accent")||"red");
+applyPlayerScale();
 
 function stopScreenAnimation(){
   const screen=document.querySelector(".lcd"),video=document.querySelector(".lcd-video");
@@ -236,12 +249,14 @@ function showInfo(){
   if(poweredOff)return;
   const title=document.getElementById("lcdTitle"),artist=document.getElementById("lcdArtist"),label=document.getElementById("lcdLbl");
   const previous={title:title.textContent,titleClass:title.className,artist:artist.textContent,label:label.textContent};
-  const credit="RadioCar create by @mateusfrmacedo";
-  label.textContent="INFO";
+  const credit="RadioCar     create by     @mateusfrmacedo";
+  const updateClock=()=>{label.textContent=new Intl.DateTimeFormat("pt-BR",{hour:"2-digit",minute:"2-digit"}).format(new Date());};
+  clearInterval(infoClockTimer);clearTimeout(infoRestoreTimer);updateClock();
   title.textContent=`${credit}       ${credit}`;
   title.className="title scroll";
   artist.textContent="";
-  setTimeout(()=>{title.textContent=previous.title;title.className=previous.titleClass;artist.textContent=previous.artist;label.textContent=previous.label;},3600);
+  infoClockTimer=setInterval(updateClock,1000);
+  infoRestoreTimer=setTimeout(()=>{clearInterval(infoClockTimer);title.textContent=previous.title;title.className=previous.titleClass;artist.textContent=previous.artist;label.textContent=previous.label;},5200);
 }
 function showUsbInfo(){const el=document.getElementById("lcdArtist"),o=el.textContent;el.textContent="USB: USE O SPOTIFY";setTimeout(()=>el.textContent=o,2200);}
 function shareTrack(){const t=document.getElementById("lcdTitle").textContent,a=document.getElementById("lcdArtist").textContent;if(!t.startsWith("-")&&navigator.clipboard){navigator.clipboard.writeText(t+" - "+a);const el=document.getElementById("lcdLbl"),o=el.textContent;el.textContent="COPIADO";setTimeout(()=>el.textContent=o,2000);}}
