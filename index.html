@@ -24,7 +24,7 @@
 
     <div class="lcd">
       <video class="lcd-video" autoplay muted loop playsinline aria-hidden="true">
-        <source src="animação.MP4" type="video/mp4">
+        <source src="assets/animação.MP4" type="video/mp4">
       </video>
       <div class="lcd-inner">
         <div class="r1">
@@ -41,8 +41,11 @@
         <div class="r2"><span class="title" id="lcdTitle">- - - - - - - -</span></div>
         <div class="r3" id="lcdArtist">AGUARDANDO SINAL</div>
         <div class="r4" id="progWrap" onclick="seekTo(event)">
-          <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
-          <div class="time-row"><span id="tCur">0:00</span><span id="tTot">0:00</span></div>
+          <div class="time-row">
+            <span id="tCur">0:00</span>
+            <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+            <span id="tTot">0:00</span>
+          </div>
         </div>
         <div class="r5">
           <span class="vol-lbl">VOL</span>
@@ -69,6 +72,7 @@
     <button class="ovr o-b5"    onclick="doFlash(this);showInfo()"></button>
     <button class="ovr o-b6"    onclick="doFlash(this);shareTrack()"></button>
     <button class="ovr o-usb"   onclick="doFlash(this);showUsbInfo()"></button>
+    <button class="ovr o-brand" onclick="doFlash(this);toggleScreenAnimation()"></button>
   </div>
 
   <div class="pl-panel auth-mode" id="plPanel">
@@ -122,6 +126,15 @@ function stopScreenAnimation(){
   screen.classList.add("screen-active");
   if(video)video.pause();
 }
+function toggleScreenAnimation(){
+  const screen=document.querySelector(".lcd"),video=document.querySelector(".lcd-video");
+  if(!screen||!video)return;
+  if(screen.classList.contains("screen-active")){
+    screen.classList.remove("screen-active");
+    video.currentTime=0;
+    video.play().catch(()=>{});
+  }else stopScreenAnimation();
+}
 
 // Knob rotation: 0-100 → -135° to +135°
 function rotateKnob(val){
@@ -138,9 +151,9 @@ function doFlash(btn){
 }
 
 const SPOTIFY_CLIENT_ID="bb679e6ebdea4e0a864c689e7ce93737";
-const REDIRECT=location.href.split("?")[0].split("#")[0];
+const REDIRECT=location.hostname.endsWith(".github.io")?location.origin+location.pathname.replace(/\/$/,""):location.href.split("?")[0].split("#")[0];
 const SCOPES="streaming user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private";
-let token=null,player=null,deviceId=null,dur=0,pos=0,isPlaying=false,shuffle=false,repeat=false,plId=null,tracks=[],poll=null,playerBooted=false,poweredOff=false;
+let token=null,player=null,deviceId=null,dur=0,pos=0,isPlaying=false,shuffle=false,repeat=false,plId=null,tracks=[],poll=null,playerBooted=false,poweredOff=false,volumeUiTimer=null;
 
 const params=new URLSearchParams(location.search);
 const savedToken=localStorage.getItem("rc_tok");
@@ -181,7 +194,8 @@ async function togglePower(){poweredOff=!poweredOff;const radio=document.getElem
 async function togglePlay(){if(poweredOff){await togglePower();return;}if(!requireConnection())return;if(player){player.togglePlay();return;}const s=await getState();await api(`/me/player/${s?.is_playing?"pause":"play"}`,{method:"PUT"});}
 async function prevTrack(){if(poweredOff||!requireConnection())return;if(player){player.previousTrack();return;}await api("/me/player/previous",{method:"POST"});}
 async function nextTrack(){if(poweredOff||!requireConnection())return;if(player){player.nextTrack();return;}await api("/me/player/next",{method:"POST"});}
-function onVol(v){if(poweredOff)return;v=Math.round(Number(v));rotateKnob(v);document.getElementById("volFill").style.width=v+"%";document.getElementById("volNum").textContent=v;if(player){player.setVolume(v/100);return;}if(requireConnection())api(`/me/player/volume?volume_percent=${v}`,{method:"PUT"});}
+function showVolumeUi(){const lcd=document.querySelector(".lcd");lcd.classList.add("volume-active");clearTimeout(volumeUiTimer);volumeUiTimer=setTimeout(()=>lcd.classList.remove("volume-active"),1800);}
+function onVol(v){if(poweredOff)return;v=Math.round(Number(v));rotateKnob(v);document.getElementById("volFill").style.width=v+"%";document.getElementById("volNum").textContent=v;showVolumeUi();if(player){player.setVolume(v/100);return;}if(requireConnection())api(`/me/player/volume?volume_percent=${v}`,{method:"PUT"});}
 async function toggleShuffle(){if(poweredOff||!requireConnection())return;shuffle=!shuffle;updIco();await api(`/me/player/shuffle?state=${shuffle}`,{method:"PUT"});}
 async function toggleRepeat(){if(poweredOff||!requireConnection())return;repeat=!repeat;updIco();await api(`/me/player/repeat?state=${repeat?"track":"off"}`,{method:"PUT"});}
 async function seekTo(e){if(poweredOff||!requireConnection()||!dur)return;const r=e.currentTarget.getBoundingClientRect();const ms=Math.floor(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*dur);if(player){player.seek(ms);return;}await api(`/me/player/seek?position_ms=${ms}`,{method:"PUT"});}
@@ -192,29 +206,29 @@ async function loadPlaylists(){if(!token)return;const r=await api("/me/playlists
 async function loadTracks(id,name,chip){plId=id;document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));chip.classList.add("on");document.getElementById("plName").textContent=name;document.getElementById("tlist").innerHTML='<div class="system-msg">SINTONIZANDO...</div>';const r=await api(`/playlists/${id}/items?limit=50`);if(!r||!r.ok){document.getElementById("tlist").innerHTML='<div class="system-msg">FAIXAS INDISPONÍVEIS NESTA PLAYLIST</div>';return;}const d=await r.json();tracks=(d.items||[]).map(i=>i.item).filter(t=>t&&t.type==="track");renderTracks();}
 function renderTracks(){const list=document.getElementById("tlist");list.innerHTML="";if(!tracks.length){list.innerHTML='<div class="system-msg">SEM FAIXAS PARA TOCAR</div>';return;}tracks.forEach((t,i)=>{const el=document.createElement("div");el.className="trow";el.dataset.uri=t.uri;el.innerHTML=`<div class="tidx"><span class="tidx-n">${i+1}</span><div class="teq"><div class="teb" style="height:3px"></div><div class="teb" style="height:7px"></div><div class="teb" style="height:2px"></div></div></div><div class="tinfo"><div class="tn"></div><div class="ta"></div></div><div class="td">${ms2t(t.duration_ms)}</div>`;el.querySelector(".tn").textContent=t.name;el.querySelector(".ta").textContent=t.artists.map(a=>a.name).join(", ");el.onclick=()=>playTrack(t.uri,i);list.appendChild(el);});}
 async function playTrack(uri,idx){if(!token)return;const body=plId?{context_uri:`spotify:playlist:${plId}`,offset:{position:idx}}:{uris:[uri]};const dev=deviceId?`?device_id=${deviceId}`:"";const r=await api(`/me/player/play${dev}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(r&&!r.ok)showAuthError("Não foi possível iniciar a reprodução neste dispositivo.");}
-function setDisp(title,artist,p,d){const el=document.getElementById("lcdTitle");el.textContent=title.length>20?title+"     "+title:title;el.className="title"+(title.length>20?" scroll":"");document.getElementById("lcdArtist").textContent=artist.toUpperCase();document.getElementById("tCur").textContent=ms2t(p);document.getElementById("tTot").textContent=ms2t(d);dur=d;pos=p;updProg();}
+function setDisp(title,artist,p,d){const el=document.getElementById("lcdTitle"),artistLine=document.getElementById("lcdArtist"),isTrack=title!=="- - - - - - - -";const marquee=isTrack?`${title}     -     ${artist}`:title;el.textContent=isTrack?marquee+"       "+marquee:marquee;el.className="title"+(isTrack?" scroll":"");artistLine.textContent=isTrack?"":artist.toUpperCase();document.getElementById("tCur").textContent=ms2t(p);document.getElementById("tTot").textContent=ms2t(d);dur=d;pos=p;updProg();}
 function updProg(){if(!dur)return;document.getElementById("progFill").style.width=(pos/dur*100)+"%";}
 function setStatus(on,txt){document.getElementById("led").className="led"+(on?"":" off");document.getElementById("lcdLbl").textContent=txt;isPlaying=on;}
-function updIco(){document.getElementById("iShuffle").className="ico"+(shuffle?" on":"");document.getElementById("iRepeat").className="ico"+(repeat?" on":"");}
+function updIco(){const sh=document.getElementById("iShuffle"),rp=document.getElementById("iRepeat");sh.className="ico"+(shuffle?" on":"");rp.className="ico"+(repeat?" on":"");sh.textContent=shuffle?"RND+":"RND";rp.textContent=repeat?"REP+":"REP";}
 function hiTrack(uri){document.querySelectorAll(".trow").forEach(el=>el.classList.toggle("on",el.dataset.uri===uri));}
 async function getState(){if(!token)return null;const r=await api("/me/player");if(!r||r.status===204||!r.ok)return null;return r.json();}
 function startPoll(){clearInterval(poll);poll=setInterval(async()=>{if(player){if(isPlaying){pos+=1000;updProg();document.getElementById("tCur").textContent=ms2t(pos);}return;}const s=await getState();if(!s||!s.item)return;isPlaying=s.is_playing;dur=s.item.duration_ms;pos=s.progress_ms;setDisp(s.item.name,s.item.artists.map(a=>a.name).join(" / "),s.progress_ms,s.item.duration_ms);setStatus(s.is_playing,s.is_playing?"TOCANDO":"PAUSADO");hiTrack(s.item.uri);shuffle=s.shuffle_state;updIco();if(isPlaying)pos+=1000;},1000);}
 function ms2t(ms){if(!ms)return"0:00";const s=Math.floor(ms/1000);return`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
-document.getElementById("knobOvr").addEventListener("wheel",e=>{e.preventDefault();const inp=document.getElementById("volRange");inp.value=Math.max(0,Math.min(100,+inp.value-Math.sign(e.deltaY)*4));onVol(inp.value);},{passive:false});
+document.getElementById("knobOvr").addEventListener("wheel",e=>{e.preventDefault();const inp=document.getElementById("volRange");inp.value=Math.max(0,Math.min(100,+inp.value-Math.sign(e.deltaY)*6));onVol(inp.value);},{passive:false});
 const knob=document.getElementById("knobOvr"),volumeInput=document.getElementById("volRange");
 let knobDrag=null;
 knob.addEventListener("pointerdown",event=>{if(poweredOff)return;knobDrag={id:event.pointerId,y:event.clientY,value:+volumeInput.value};knob.setPointerCapture(event.pointerId);});
-knob.addEventListener("pointermove",event=>{if(!knobDrag||event.pointerId!==knobDrag.id)return;const value=Math.max(0,Math.min(100,knobDrag.value-(event.clientY-knobDrag.y)*.7));volumeInput.value=value;onVol(value);});
+knob.addEventListener("pointermove",event=>{if(!knobDrag||event.pointerId!==knobDrag.id)return;const value=Math.max(0,Math.min(100,knobDrag.value-(event.clientY-knobDrag.y)*1.1));volumeInput.value=value;onVol(value);});
 ["pointerup","pointercancel"].forEach(type=>knob.addEventListener(type,event=>{if(knobDrag?.id===event.pointerId)knobDrag=null;}));
 document.querySelectorAll(".ovr").forEach(control=>{
-  control.addEventListener("pointerdown",()=>{stopScreenAnimation();control.classList.add("is-pressed");if(navigator.vibrate)navigator.vibrate(8);});
+  control.addEventListener("pointerdown",()=>{if(!control.classList.contains("o-brand"))stopScreenAnimation();control.classList.add("is-pressed");if(navigator.vibrate)navigator.vibrate(8);});
   ["pointerup","pointercancel","pointerleave"].forEach(type=>control.addEventListener(type,()=>control.classList.remove("is-pressed")));
 });
 function openLibrary(){if(token)toggleLibrary(false);document.getElementById("plPanel").scrollIntoView({behavior:"smooth",block:"center"});}
 document.querySelector(".o-spt").addEventListener("click",()=>{if(!token){connectSpotify();return;}toggleLibrary();document.getElementById("plPanel").scrollIntoView({behavior:"smooth",block:"center"});});
 document.querySelector(".o-menu").addEventListener("click",openLibrary);
-Object.entries({".o-play":"Tocar ou pausar",".o-power":"Ligar ou desligar",".o-menu":"Abrir playlists",".o-spt":"Conectar Spotify",".o-back":"Faixa anterior",".o-b1":"Faixa anterior",".o-b2":"Próxima faixa",".o-b3":"Alternar aleatório",".o-b4":"Alternar repetição",".o-b5":"Informações da faixa",".o-b6":"Copiar informações da faixa",".o-usb":"Informações da entrada USB"}).forEach(([selector,label])=>document.querySelector(selector).setAttribute("aria-label",label));
-document.addEventListener("pointerdown",event=>{if(event.target.closest("button, input, .r4, .trow"))stopScreenAnimation();});
+Object.entries({".o-play":"Tocar ou pausar",".o-power":"Ligar ou desligar",".o-menu":"Abrir playlists",".o-spt":"Conectar Spotify",".o-back":"Faixa anterior",".o-b1":"Faixa anterior",".o-b2":"Próxima faixa",".o-b3":"Alternar aleatório",".o-b4":"Alternar repetição",".o-b5":"Informações da faixa",".o-b6":"Copiar informações da faixa",".o-usb":"Informações da entrada USB",".o-brand":"Alternar animação da tela"}).forEach(([selector,label])=>document.querySelector(selector).setAttribute("aria-label",label));
+document.addEventListener("pointerdown",event=>{if(event.target.closest(".o-brand"))return;if(event.target.closest("button, input, .r4, .trow"))stopScreenAnimation();});
 </script>
 </body>
 </html>
