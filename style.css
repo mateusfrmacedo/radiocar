@@ -2,6 +2,10 @@
 @font-face { font-family:"DSEG14 Classic"; src:url("assets/fonts/DSEG14Classic-Regular.woff2") format("woff2"); font-weight:400; font-style:normal; font-display:swap; }
 
 body {
+  --accent:#ff3018;
+  --accent-dim:#9e2417;
+  --accent-rgb:255,48,24;
+  --accent-hue:0deg;
   background: #151515;
   min-height: 100vh;
   display: flex; flex-direction: column;
@@ -10,6 +14,21 @@ body {
   overflow-x: hidden;
   transition: background .4s;
 }
+body[data-accent="blue"] { --accent:#258cff; --accent-dim:#256ab3; --accent-rgb:37,140,255; --accent-hue:205deg; }
+body[data-accent="green"] { --accent:#35dc62; --accent-dim:#2d9148; --accent-rgb:53,220,98; --accent-hue:110deg; }
+body[data-accent="yellow"] { --accent:#ffd629; --accent-dim:#ad8e1d; --accent-rgb:255,214,41; --accent-hue:48deg; }
+body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:32,229,230; --accent-hue:180deg; }
+
+.accent-picker { position:fixed; top:18px; left:22px; z-index:100; display:flex; align-items:center; gap:8px; font-family:"Share Tech Mono",monospace; }
+.accent-toggle { border:1px solid #3d3d3d; border-radius:12px; background:linear-gradient(#353535,#181818); color:#aaa; padding:3px 8px; font:inherit; font-size:10px; letter-spacing:1.5px; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.12),0 1px 4px rgba(0,0,0,.45); }
+.accent-toggle:active { transform:translateY(1px); box-shadow:inset 0 1px 3px #000; }
+.accent-choices { display:flex; gap:5px; max-width:0; overflow:hidden; opacity:0; transition:max-width .25s ease,opacity .18s ease; }
+.accent-picker.open .accent-choices { max-width:110px; opacity:1; overflow:visible; padding:2px; }
+.accent-dot { width:13px; height:13px; flex:0 0 13px; border:1px solid rgba(255,255,255,.28); border-radius:50%; cursor:pointer; box-shadow:inset 0 1px 2px rgba(255,255,255,.5),0 1px 3px #000; transition:transform .14s ease,box-shadow .14s ease; }
+.accent-dot:hover,.accent-dot.selected { transform:scale(1.18); box-shadow:0 0 7px currentColor,inset 0 1px 2px rgba(255,255,255,.65); }
+.accent-dot.red { background:#e33120; color:#e33120; }.accent-dot.blue { background:#258cff; color:#258cff; }.accent-dot.green { background:#35dc62; color:#35dc62; }.accent-dot.yellow { background:#ffd629; color:#ffd629; }.accent-dot.cyan { background:#20e5e6; color:#20e5e6; }
+.accent-picker,.bg-toggle { top:auto; bottom:18px; }
+.accent-picker { left:22px; }.bg-toggle { right:22px; }
 
 .bg-toggle {
   position: fixed; top: 18px; right: 22px;
@@ -44,7 +63,7 @@ body {
   transform-origin: center center;
   transform: rotate(-27deg);
   transition: transform 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  filter: brightness(0.9) contrast(1.05);
+  filter:hue-rotate(var(--accent-hue)) brightness(0.9) contrast(1.05);
 }
 
 /* ============================
@@ -85,6 +104,127 @@ body {
 .r5 { align-self:center; gap:.46cqw; }
 .vol-lbl,.vol-num { font-size:.95cqw; line-height:1; }
 .vol-track { height:.35cqw; }
+
+.lcd.volume-active .vol-lbl,.lcd.volume-active .vol-num { color:var(--accent); text-shadow:0 0 7px rgba(var(--accent-rgb),.65); }
+.lcd.volume-active .vol-track { border-color:var(--accent-dim); }
+.lcd.volume-active .vol-fill { background:linear-gradient(90deg,var(--accent-dim),var(--accent)); box-shadow:0 0 7px rgba(var(--accent-rgb),.55); }
+
+/* Match each interaction layer to the stamped button underneath it. */
+.o-menu { border-radius:0; clip-path:polygon(8% 0,92% 0,100% 12%,100% 88%,92% 100%,8% 100%,0 88%,0 12%); }
+.o-spt { border-radius:0; clip-path:polygon(8% 0,92% 0,100% 11%,100% 89%,92% 100%,8% 100%,0 89%,0 11%); }
+.o-back { border-radius:0; clip-path:polygon(9% 0,91% 0,100% 12%,100% 88%,91% 100%,9% 100%,0 88%,0 12%); }
+.o-usb { border-radius:0; clip-path:polygon(8% 0,92% 0,100% 7%,100% 93%,92% 100%,8% 100%,0 93%,0 7%); }
+.o-brand { border-radius:0; clip-path:polygon(8% 0,92% 0,100% 20%,87% 100%,13% 100%,0 20%); }
+.ovr.is-pressed:not(.o-knob) { transform:translateY(.8px); filter:brightness(.84) saturate(.88); }
+.ovr.is-pressed:not(.o-knob)::before { inset:3%; opacity:.58; box-shadow:inset 0 2px 5px rgba(0,0,0,.8),inset 0 -1px 1px rgba(255,255,255,.2); }
+
+/* Final silhouette map. The transparent click areas remain generous, while
+   the pressed surface follows the physical keycap printed in the artwork. */
+.o-menu { --press-inset:6% 4% 4% 5%; clip-path:polygon(13% 0,100% 0,100% 78%,87% 100%,0 100%,0 18%); }
+.o-spt { --press-inset:7%; clip-path:polygon(8% 0,92% 0,100% 9%,100% 91%,92% 100%,8% 100%,0 91%,0 9%); }
+.o-back { --press-inset:6% 4% 7% 5%; clip-path:polygon(11% 0,84% 0,100% 14%,100% 78%,86% 100%,8% 100%,0 86%,0 14%); }
+.o-play { --press-inset:9% 3% 9% 0; clip-path:none; border-radius:0 49% 49% 0; }
+.o-power { --press-inset:7%; clip-path:circle(50%); }
+.o-usb { --press-inset:5%; clip-path:polygon(7% 0,93% 0,100% 5%,100% 95%,93% 100%,7% 100%,0 95%,0 5%); }
+.o-brand { --press-inset:7% 4%; clip-path:polygon(7% 0,93% 0,100% 16%,87% 100%,13% 100%,0 16%); }
+.o-b1,.o-b2,.o-b3,.o-b4,.o-b5,.o-b6 { --press-inset:8% 5%; clip-path:polygon(14% 0,86% 0,100% 32%,88% 100%,12% 100%,0 68%); }
+.ovr.is-pressed:not(.o-knob)::before { inset:var(--press-inset,7%); }
+
+/* SVG mode symbols: hidden at rest, illuminated with the radio palette when on. */
+.lcd-mode-icon { display:none; width:1.55cqw; height:1.55cqw; line-height:0; }
+.lcd-mode-icon svg { display:block; width:100%; height:100%; }
+.lcd-mode-icon.on { display:inline-flex; align-items:center; justify-content:center; }
+.lcd-bt-icon { display:inline-flex; width:1.35cqw; height:1.35cqw; line-height:0; align-items:center; justify-content:center; }
+.lcd-bt-icon svg { display:block; width:100%; height:100%; }
+
+/* The DSEG characters have tall descenders and a large glow. Give the title
+   its own breathing room instead of clipping the bottom of the glyphs. */
+.lcd:not(.volume-active) .lcd-inner { grid-template-rows:15% 57% 0 28% 0; }
+.lcd .r2 { overflow:visible; align-items:flex-end; padding-top:.35cqw; }
+.lcd .title { top:0; font-size:3.35cqw; line-height:1.05; padding:.16cqw 0 .28cqw; text-shadow:0 0 7px rgba(var(--accent-rgb),.9),0 0 15px rgba(var(--accent-rgb),.52),0 0 22px rgba(var(--accent-rgb),.18); }
+
+/* Status LED shares the selected dashboard illumination colour. */
+.lcd .led:not(.off) { background:var(--accent); box-shadow:0 0 4px var(--accent),0 0 8px rgba(var(--accent-rgb),.68); }
+
+/* Compact SVG indicators must fit the narrow LCD status lane. */
+.lcd .icons { min-height:0; overflow:visible; align-items:center; }
+.lcd .lcd-mode-icon { display:none; width:1.02cqw; height:1.02cqw; flex:0 0 1.02cqw; }
+.lcd .lcd-mode-icon.on,.lcd .lcd-bt-icon { display:inline-flex; align-items:center; justify-content:center; }
+.lcd .lcd-bt-icon { width:.94cqw; height:.94cqw; flex:0 0 .94cqw; }
+
+/* Keep the mode lamps independent from the compact status grid. */
+.lcd .icons { position:absolute; top:.28cqw; right:.1cqw; display:flex; gap:.5cqw; z-index:20; }
+.lcd .icons .ico { color:var(--accent); opacity:1; }
+.lcd .icons svg { color:var(--accent); stroke:currentColor; }
+.lcd .title { top:.24cqw; }
+
+/* Real-button press: no permanently visible rectangle over the radio artwork. */
+.ovr:not(.o-knob)::before { opacity:0; background:transparent; box-shadow:none; mix-blend-mode:normal; }
+.ovr:hover:not(.o-knob)::before,.ovr:hover::after { opacity:0; }
+.ovr.is-pressed:not(.o-knob) { transform:translateY(.65px); filter:none; }
+.ovr.is-pressed:not(.o-knob)::before { inset:0; opacity:1; background:radial-gradient(ellipse at 50% 30%,rgba(0,0,0,.08),rgba(0,0,0,.42)); mix-blend-mode:multiply; box-shadow:inset 0 2px 4px rgba(0,0,0,.82),inset 0 -1px rgba(255,255,255,.1); }
+.ovr.is-pressed::after { opacity:0; }
+
+/* The hit target may be generous, but the visual press is limited to the
+   real keycap inside it. These silhouettes mirror the radio's actual parts. */
+.o-menu { --press-inset:6% 4% 4% 5%; clip-path:polygon(13% 0,100% 0,100% 78%,87% 100%,0 100%,0 18%); }
+.o-spt { --press-inset:7%; clip-path:polygon(8% 0,92% 0,100% 9%,100% 91%,92% 100%,8% 100%,0 91%,0 9%); }
+.o-back { --press-inset:6% 4% 7% 5%; clip-path:polygon(11% 0,84% 0,100% 14%,100% 78%,86% 100%,8% 100%,0 86%,0 14%); }
+.o-play { --press-inset:9% 3% 9% 0; clip-path:none; border-radius:0 49% 49% 0; }
+.o-power { --press-inset:7%; clip-path:circle(50%); }
+.o-usb { --press-inset:5%; clip-path:polygon(7% 0,93% 0,100% 5%,100% 95%,93% 100%,7% 100%,0 95%,0 5%); }
+.o-brand { --press-inset:7% 4%; clip-path:polygon(7% 0,93% 0,100% 16%,87% 100%,13% 100%,0 16%); }
+.o-b1,.o-b2,.o-b3,.o-b4,.o-b5,.o-b6 { --press-inset:8% 5%; clip-path:polygon(14% 0,86% 0,100% 32%,88% 100%,12% 100%,0 68%); }
+.ovr.is-pressed:not(.o-knob)::before { inset:var(--press-inset,7%); }
+
+/* Three digital digits plus a safety margin: 100 must never clip. */
+.lcd.volume-active .r5 { gap:.75cqw; }
+.lcd.volume-active .vol-num { width:4.8cqw; min-width:4.8cqw; flex:0 0 4.8cqw; overflow:visible; }
+
+/* Depth is visible only while pressing: no generic highlight frame is drawn over
+   the artwork. The dark inset is clipped by each button's own silhouette. */
+.ovr:not(.o-knob)::before { opacity:0; background:transparent; box-shadow:none; mix-blend-mode:normal; }
+.ovr:hover:not(.o-knob)::before,.ovr:hover::after { opacity:0; }
+.ovr.is-pressed:not(.o-knob) { transform:translateY(.65px); filter:none; }
+.ovr.is-pressed:not(.o-knob)::before { inset:0; opacity:1; background:radial-gradient(ellipse at 50% 30%,rgba(0,0,0,.08),rgba(0,0,0,.42)); mix-blend-mode:multiply; box-shadow:inset 0 2px 4px rgba(0,0,0,.82),inset 0 -1px rgba(255,255,255,.1); }
+.ovr.is-pressed::after { opacity:0; }
+
+.lcd.volume-active .vol-num { width:3.8cqw; min-width:3.8cqw; }
+
+/* Compact settings control: gear button with a raised, self-contained panel. */
+.settings-menu { position:fixed; left:22px; bottom:18px; z-index:100; display:flex; align-items:center; gap:8px; font-family:"Share Tech Mono",monospace; }
+.settings-trigger { width:34px; height:34px; display:grid; place-items:center; border:1px solid #3d3d3d; border-radius:50%; background:linear-gradient(#404040,#171717); color:#bbb; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.16),inset 0 -2px 3px rgba(0,0,0,.55),0 2px 5px rgba(0,0,0,.5); transition:transform .14s ease,filter .14s ease; }
+.settings-trigger svg { width:18px; height:18px; fill:currentColor; transition:transform .28s ease; }
+.settings-menu.open .settings-trigger svg { transform:rotate(55deg); }
+.settings-trigger:active { transform:translateY(1px) scale(.96); filter:brightness(.78); box-shadow:inset 0 2px 5px #000; }
+.settings-spotify { width:34px; height:34px; display:grid; place-items:center; border:1px solid #196b35; border-radius:50%; background:linear-gradient(#32c764,#15843f); color:#071b0e; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.42),inset 0 -2px 3px rgba(0,0,0,.28),0 2px 5px rgba(0,0,0,.5); transition:transform .14s ease,filter .14s ease; }
+.settings-spotify svg { width:20px; height:20px; fill:currentColor; }
+.settings-spotify:active { transform:translateY(1px) scale(.96); filter:brightness(.78); box-shadow:inset 0 2px 5px rgba(0,0,0,.45); }
+.settings-popup { position:absolute; left:0; bottom:44px; width:154px; padding:9px; border:1px solid #3d3d3d; border-radius:8px; background:linear-gradient(145deg,rgba(48,48,48,.98),rgba(14,14,14,.98)); box-shadow:inset 0 1px rgba(255,255,255,.15),0 8px 22px rgba(0,0,0,.55); opacity:0; visibility:hidden; transform:translateY(5px) scale(.96); transform-origin:left bottom; transition:opacity .16s ease,transform .16s ease,visibility .16s step-end; }
+.settings-menu.open .settings-popup { opacity:1; visibility:visible; transform:translateY(0) scale(1); transition:opacity .16s ease,transform .16s ease; }
+.settings-theme { width:100%; display:flex; align-items:center; justify-content:center; border:1px solid #515151; border-radius:5px; background:linear-gradient(#3d3d3d,#202020); color:#aaa; padding:6px 7px; font:inherit; font-size:10px; letter-spacing:1.2px; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.12),inset 0 -1px rgba(0,0,0,.6); }
+.settings-theme:active { transform:translateY(1px); box-shadow:inset 0 1px 4px #000; }
+.settings-theme strong { color:#e2e2e2; font:inherit; }
+.settings-colors { display:flex; align-items:center; justify-content:space-between; margin-top:9px; color:#888; font-size:10px; letter-spacing:1.2px; }
+.settings-dots { display:flex; align-items:center; gap:6px; }
+.settings-dots .accent-dot { width:14px; height:14px; flex-basis:14px; }
+body.light .settings-popup { background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(220,220,220,.98)); border-color:#aaa; }
+body.light .settings-theme { background:linear-gradient(#fff,#ddd); border-color:#aaa; color:#555; }
+body.light .settings-theme strong,body.light .settings-colors { color:#444; }
+/* Connection now lives beside the gear, leaving no duplicate call-to-action below the radio. */
+.pl-panel.auth-mode { display:none; }
+
+/* Global controls stay together in the footer and clear of the physical player. */
+.accent-picker,.bg-toggle { top:auto; bottom:18px; }
+.bg-toggle { right:auto; left:22px; display:inline-flex; align-items:center; border:1px solid #3d3d3d; border-radius:12px; background:linear-gradient(#353535,#181818); color:#aaa !important; padding:3px 8px; font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:1.5px; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.12),0 1px 4px rgba(0,0,0,.45); }
+.bg-toggle:active { transform:translateY(1px); box-shadow:inset 0 1px 3px #000; }
+.bg-toggle-label { color:#aaa !important; font:inherit; letter-spacing:inherit; }
+.bg-toggle .toggle-track { display:none; }
+.accent-picker { left:102px; }
+
+/* The temporary volume display uses the selected illumination color too. */
+.lcd.volume-active .vol-lbl,.lcd.volume-active .vol-num { color:var(--accent); text-shadow:0 0 7px rgba(var(--accent-rgb),.65); }
+.lcd.volume-active .vol-fill { background:linear-gradient(90deg,var(--accent-dim),var(--accent)); box-shadow:0 0 7px rgba(var(--accent-rgb),.55); }
 .lcd::before { z-index:10; }
 .lcd::after { z-index:9; background:linear-gradient(90deg,rgba(0,0,0,.54),transparent 38%,rgba(0,0,0,.38)),radial-gradient(ellipse at 50% 30%,rgba(255,15,0,0.16) 0%,transparent 65%); }
 .lcd::before { content:""; position:absolute; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.20) 2px,rgba(0,0,0,0.20) 3px); pointer-events:none; z-index:10; }
@@ -219,15 +359,23 @@ body.light { background: radial-gradient(circle at 50% 15%, #fff 0, #e9e9e9 48%,
 .scene { width:min(100%, 940px); padding:clamp(14px, 3vw, 30px); }
 .radio-wrapper { width:min(860px, 100%); height:auto; aspect-ratio:860 / 265; filter:drop-shadow(0 24px 24px rgba(0,0,0,.55)); }
 .radio-img { height:100%; box-shadow:inset 0 1px rgba(255,255,255,.08), 0 1px 0 rgba(255,255,255,.05); }
+.radio-img { filter:hue-rotate(var(--accent-hue)); transition:filter .35s ease; }
 .radio-wrapper::after { content:""; position:absolute; inset:0; pointer-events:none; border-radius:7px; background:linear-gradient(112deg,rgba(255,255,255,.09),transparent 18%,transparent 76%,rgba(0,0,0,.3)); mix-blend-mode:screen; }
 .lcd { box-shadow: inset 0 1px 5px #000, inset 0 0 18px rgba(210,10,0,.16), 0 0 5px rgba(255,38,0,.18); }
 .lcd-inner { text-shadow:0 0 1px currentColor; }
 /* Reserve fixed vertical lanes for the status, title and timeline.  DSEG has
    tall glyphs, so a grid prevents its ascenders from being clipped. */
-.lcd:not(.volume-active) .lcd-inner { display:grid; grid-template-rows:15% 53% 0 32% 0; height:100%; }
+.lcd:not(.volume-active) .lcd-inner { display:grid; grid-template-rows:15% 62% 0 23% 0; height:100%; }
 .lcd:not(.volume-active) .r1,.lcd:not(.volume-active) .r2,.lcd:not(.volume-active) .r3,.lcd:not(.volume-active) .r4 { height:auto; }
 .lcd .title,.lcd .r3,.lcd .lbl,.lcd .ico,.lcd .time-row,.lcd .vol-lbl,.lcd .vol-num { font-family:"DSEG14 Classic",monospace; }
-.lcd .icons { position:absolute; top:.58cqw; right:1.05cqw; display:flex; gap:.55cqw; z-index:12; }
+.lcd .title { color:var(--accent); text-shadow:0 0 7px rgba(var(--accent-rgb),.82),0 0 14px rgba(var(--accent-rgb),.34); }
+.lcd .lbl,.lcd .r3,.lcd .time-row { color:var(--accent-dim); }
+.lcd .ico.on { color:var(--accent); text-shadow:0 0 8px rgba(var(--accent-rgb),.9),0 0 14px rgba(var(--accent-rgb),.45); }
+.lcd #tTot { color:var(--accent); text-shadow:0 0 5px rgba(var(--accent-rgb),.45); }
+.prog-fill { background:linear-gradient(90deg,var(--accent-dim),var(--accent)); box-shadow:0 0 5px rgba(var(--accent-rgb),.6); }
+.lcd.volume-active .vol-lbl,.lcd.volume-active .vol-num { color:var(--accent); text-shadow:0 0 7px rgba(var(--accent-rgb),.65); }
+.lcd.volume-active .vol-fill { background:linear-gradient(90deg,var(--accent-dim),var(--accent)); box-shadow:0 0 7px rgba(var(--accent-rgb),.55); }
+.lcd .icons { position:static; margin-left:auto; align-self:center; display:flex; gap:.55cqw; z-index:12; }
 .lcd .ico { color:#a52a1b; opacity:.8; font-size:1cqw; }
 .lcd .ico.on { color:#ff3b1c; opacity:1; text-shadow:0 0 8px rgba(255,43,18,.9),0 0 14px rgba(255,20,0,.45); }
 .lcd .time-row { position:relative; grid-template-columns:3.7cqw minmax(0,1fr); gap:.55cqw; padding-right:4.25cqw; font-size:.9cqw; color:#a52a1b; white-space:nowrap; }
@@ -235,7 +383,7 @@ body.light { background: radial-gradient(circle at 50% 15%, #fff 0, #e9e9e9 48%,
 .lcd #tCur,.lcd #tTot { display:block; overflow:visible; opacity:1; }
 .lcd #tTot { position:absolute; right:0; top:50%; color:#e4311c; min-width:3.7cqw; transform:translateY(-50%); text-align:right; text-shadow:0 0 5px rgba(255,40,15,.45); }
 .r2 { overflow:hidden; justify-content:center; align-items:end; }
-.title { position:relative; top:0; font-size:2.9cqw; line-height:1; letter-spacing:1.4px; }
+.title { position:relative; top:.68cqw; font-size:2.9cqw; line-height:1; letter-spacing:1.4px; }
 .lcd:not(.volume-active) .r5 { opacity:0; visibility:hidden; pointer-events:none; }
 .lcd.volume-active .lcd-inner { display:flex; align-items:center; justify-content:center; }
 .lcd.volume-active .r1,.lcd.volume-active .r2,.lcd.volume-active .r3,.lcd.volume-active .r4 { display:none; }
@@ -257,11 +405,13 @@ body.light { background: radial-gradient(circle at 50% 15%, #fff 0, #e9e9e9 48%,
 .radio-wrapper.is-powered-off .lcd { background:#010101; box-shadow:inset 0 1px 6px #000; }
 .radio-wrapper.is-powered-off .lcd-video { opacity:0; }
 .radio-wrapper.is-powered-off .lcd-inner { opacity:0; visibility:hidden; }
-.radio-wrapper.is-powered-off .radio-img { filter:grayscale(1) saturate(0) brightness(.28) contrast(.9); }
+.radio-wrapper.is-powered-off .radio-img { filter:none; }
 .radio-wrapper.is-powered-off .knob-img { filter:grayscale(1) saturate(0) brightness(.3) contrast(.9); }
 .radio-wrapper.is-powered-off::after { background:rgba(0,0,0,.48); mix-blend-mode:normal; }
 .radio-wrapper.is-powered-off .btn-flash { display:none; }
 .radio-wrapper.is-powered-off .ovr:not(.o-power) { pointer-events:none; }
+.radio-wrapper.is-powered-off .ovr:not(.o-knob)::before { inset:4%; opacity:.82; mix-blend-mode:multiply; background:#030303; box-shadow:inset 0 1px 4px #000,inset 0 -1px rgba(255,255,255,.04); }
+.radio-wrapper.is-powered-off .ovr::after { opacity:0; }
 .o-knob { touch-action:none; }
 .o-knob.is-pressed { transform:none; filter:none; }
 .o-knob::after { display:none; }
@@ -281,7 +431,8 @@ body.light .pl-panel.is-collapsed { background:transparent; border-color:transpa
 .auth-hint { margin:8px auto 0; max-width:440px; color:#683636; font-size:10px; text-align:center; line-height:1.5; letter-spacing:.4px; }
 .system-msg { font-family:"VT323",monospace; color:#9b2515; text-align:center; font-size:15px; letter-spacing:1px; padding:12px; }
 @media (max-width:620px) {
-  .bg-toggle { top:10px; right:12px; }
+  .accent-picker { left:12px; bottom:12px; }
+  .bg-toggle { top:auto; right:12px; bottom:12px; }
   .bg-toggle-label { display:none; }
   .scene { gap:12px; padding:48px 10px 16px; }
   .pl-panel { padding:13px 12px; border-radius:5px; }
@@ -290,6 +441,28 @@ body.light .pl-panel.is-collapsed { background:transparent; border-color:transpa
   .chip { flex:0 0 auto; }
   .tlist { max-height:190px; }
 }
+
+/* Accent color reaches every illuminated/display element, including styles
+   declared earlier for the original red interface. */
+.lcd .lbl,.lcd .r3,.lcd .time-row { color:var(--accent-dim); }
+.lcd .ico,.lcd .ico.on,.lcd #tCur,.lcd #tTot { color:var(--accent); }
+.lcd .ico.on { text-shadow:0 0 8px rgba(var(--accent-rgb),.9),0 0 14px rgba(var(--accent-rgb),.45); }
+.lcd .prog-fill { background:linear-gradient(90deg,var(--accent-dim),var(--accent)); box-shadow:0 0 5px rgba(var(--accent-rgb),.6); }
+.pl-panel { border-color:rgba(var(--accent-rgb),.28); box-shadow:inset 0 1px rgba(var(--accent-rgb),.16),0 18px 45px rgba(0,0,0,.55); }
+.pt,.p-exit,.panel-toggle { color:var(--accent-dim); }
+.pl-line { background:linear-gradient(90deg,var(--accent-dim),transparent); }
+.panel-toggle { border-color:rgba(var(--accent-rgb),.38); }
+.panel-toggle:hover { color:var(--accent); border-color:var(--accent); }
+.chip { border-color:rgba(var(--accent-rgb),.22); color:var(--accent-dim); }
+.chip:hover,.chip.on { border-color:var(--accent); color:var(--accent); }
+.chip.on { background:rgba(var(--accent-rgb),.08); box-shadow:0 0 7px rgba(var(--accent-rgb),.32); }
+.trow:hover,.trow.on { background:rgba(var(--accent-rgb),.08); }
+.trow.on .tn,.teb { color:var(--accent); background-color:var(--accent); }
+body.light .pl-panel { border-color:rgba(var(--accent-rgb),.35); }
+body.light .pt,body.light .p-exit,body.light .panel-toggle,body.light .chip { color:var(--accent-dim); }
+body.light .pl-line { background:linear-gradient(90deg,var(--accent-dim),transparent); }
+body.light .chip.on { background:rgba(var(--accent-rgb),.12); border-color:var(--accent); color:var(--accent); }
+.system-msg { color:var(--accent); text-shadow:0 0 6px rgba(var(--accent-rgb),.28); }
 
 /* Keep the digital display in a proportional five-row grid at every width. */
 .lcd { padding:.58cqw 1.05cqw .46cqw; }
@@ -308,3 +481,66 @@ body.light .pl-panel.is-collapsed { background:transparent; border-color:transpa
 .r5 { align-self:center; gap:.46cqw; }
 .vol-lbl,.vol-num { font-size:.95cqw; line-height:1; }
 .vol-track { height:.35cqw; }
+
+/* Final override: volume must follow the active illumination palette. */
+.lcd.volume-active .vol-lbl,.lcd.volume-active .vol-num { color:var(--accent); text-shadow:0 0 7px rgba(var(--accent-rgb),.65); }
+.lcd.volume-active .vol-track { border-color:var(--accent-dim); }
+.lcd.volume-active .vol-fill { background:linear-gradient(90deg,var(--accent-dim),var(--accent)); box-shadow:0 0 7px rgba(var(--accent-rgb),.55); }
+
+/* Final interaction pass: a shallow physical press, with the exact key silhouettes. */
+.o-menu { border-radius:0; clip-path:polygon(8% 0,92% 0,100% 12%,100% 88%,92% 100%,8% 100%,0 88%,0 12%); }
+.o-spt { border-radius:0; clip-path:polygon(8% 0,92% 0,100% 11%,100% 89%,92% 100%,8% 100%,0 89%,0 11%); }
+.o-back { border-radius:0; clip-path:polygon(9% 0,91% 0,100% 12%,100% 88%,91% 100%,9% 100%,0 88%,0 12%); }
+.o-usb { border-radius:0; clip-path:polygon(8% 0,92% 0,100% 7%,100% 93%,92% 100%,8% 100%,0 93%,0 7%); }
+.o-brand { border-radius:0; clip-path:polygon(8% 0,92% 0,100% 20%,87% 100%,13% 100%,0 20%); }
+.ovr.is-pressed:not(.o-knob) { transform:translateY(.8px); filter:brightness(.84) saturate(.88); }
+.ovr.is-pressed:not(.o-knob)::before { inset:3%; opacity:.58; box-shadow:inset 0 2px 5px rgba(0,0,0,.8),inset 0 -1px 1px rgba(255,255,255,.2); }
+
+/* Final LCD title clearance: preserve DSEG descenders and its light halo. */
+.lcd:not(.volume-active) .lcd-inner { grid-template-rows:15% 57% 0 28% 0; }
+.lcd .r2 { overflow:visible; align-items:flex-end; padding-top:.35cqw; }
+.lcd .title { top:0; font-size:3.35cqw; line-height:1.05; padding:.16cqw 0 .28cqw; text-shadow:0 0 7px rgba(var(--accent-rgb),.9),0 0 15px rgba(var(--accent-rgb),.52),0 0 22px rgba(var(--accent-rgb),.18); }
+
+/* Status LED shares the selected dashboard illumination colour. */
+.lcd .led:not(.off) { background:var(--accent); box-shadow:0 0 4px var(--accent),0 0 8px rgba(var(--accent-rgb),.68); }
+
+/* Final SVG status-indicator sizing. */
+.lcd .icons { min-height:0; overflow:visible; align-items:center; }
+.lcd .lcd-mode-icon { display:none; width:1.02cqw; height:1.02cqw; flex:0 0 1.02cqw; }
+.lcd .lcd-mode-icon.on,.lcd .lcd-bt-icon { display:inline-flex; align-items:center; justify-content:center; }
+.lcd .lcd-bt-icon { width:.94cqw; height:.94cqw; flex:0 0 .94cqw; }
+
+/* Pin illuminated SVG modes to the LCD's upper-right corner. */
+.lcd .icons { position:absolute; top:.28cqw; right:.1cqw; display:flex; gap:.5cqw; z-index:20; }
+.lcd .icons .ico { color:var(--accent); opacity:1; }
+.lcd .icons svg { color:var(--accent); stroke:currentColor; }
+.lcd .title { top:.24cqw; }
+
+/* Larger symbols and a timeline anchored safely within the LCD bezel. */
+.lcd .lcd-mode-icon { width:1.32cqw; height:1.32cqw; flex:0 0 1.32cqw; }
+.lcd .lcd-bt-icon { width:1.2cqw; height:1.2cqw; flex:0 0 1.2cqw; }
+.lcd .r4 { position:absolute; left:0; right:0; bottom:.12cqw; height:1.32cqw; display:block; }
+.lcd .time-row { height:100%; margin:0; align-items:center; }
+.lcd .time-row .prog-track { align-self:center; }
+
+/* Playlists return to the direct Spotify list view; no textual show/hide control. */
+#panelToolbar { display:none !important; }
+
+/* Playlists are easier to scan as a vertical selector than as tiny chips. */
+.chips { display:flex; flex-direction:column; flex-wrap:nowrap; gap:5px; max-height:210px; overflow-y:auto; padding-right:4px; margin-bottom:12px; scrollbar-width:thin; scrollbar-color:var(--accent-dim) transparent; }
+.chip { width:100%; min-height:31px; padding:7px 11px; border-radius:4px; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:11px; }
+
+.p-hide { font-family:"VT323",monospace; font-size:13px; color:var(--accent-dim); cursor:pointer; letter-spacing:1.5px; background:none; border:0; padding:0; transition:color .15s,transform .1s; }
+.p-hide:hover { color:var(--accent); }
+.p-hide:active { transform:translateY(1px); }
+
+/* LCD mode lamps match the size and illuminated feel of PLAYING. */
+.lcd .lcd-mode-icon { width:1.5cqw; height:1.5cqw; flex-basis:1.5cqw; }
+.lcd .lcd-bt-icon { width:1.38cqw; height:1.38cqw; flex-basis:1.38cqw; }
+.lcd .icons svg { filter:drop-shadow(0 0 2px rgba(var(--accent-rgb),.95)) drop-shadow(0 0 5px rgba(var(--accent-rgb),.55)); }
+
+/* Slightly lower the scrolling song title without losing descender clearance. */
+.lcd .title { top:.36cqw; }
+
+/* Center mode icons on the exact status lane used by PLAYING. */
+.lcd .icons { top:0; height:15%; align-items:center; }
