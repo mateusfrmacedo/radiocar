@@ -142,13 +142,18 @@
 </div>
 
 <script>
-let isLight=false;
+let isLight=localStorage.getItem("radiocar-theme")==="light";
 let infoClockTimer=null,infoRestoreTimer=null;
+function applyTheme(){
+  const b=document.getElementById("body"),label=document.getElementById("settingsTheme");
+  b.style.background=isLight?"#EDEDED":"#151515";
+  b.classList.toggle("light",isLight);
+  label.textContent=isLight?"LIGHT":"DARK";
+}
 function toggleBg(){
   isLight=!isLight;
-  const b=document.getElementById("body"),label=document.getElementById("settingsTheme");
-  if(isLight){b.style.background="#EDEDED";b.classList.add("light");label.textContent="LIGHT";}
-  else{b.style.background="#151515";b.classList.remove("light");label.textContent="DARK";}
+  localStorage.setItem("radiocar-theme",isLight?"light":"dark");
+  applyTheme();
 }
 
 function toggleSettings(){const menu=document.getElementById("settingsMenu"),trigger=menu.querySelector(".settings-trigger"),open=menu.classList.toggle("open");trigger.setAttribute("aria-expanded",String(open));}
@@ -165,6 +170,7 @@ function setAccent(color){
 }
 setAccent(localStorage.getItem("radiocar-accent")||"red");
 applyPlayerScale();
+applyTheme();
 
 function stopScreenAnimation(){
   const screen=document.querySelector(".lcd"),video=document.querySelector(".lcd-video");
