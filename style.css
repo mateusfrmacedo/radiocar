@@ -357,7 +357,7 @@ body.light .td { color:#886666; }
 body { background: radial-gradient(circle at 50% 15%, #2d2d2d 0, #151515 43%, #0a0a0a 100%); }
 body.light { background: radial-gradient(circle at 50% 15%, #fff 0, #e9e9e9 48%, #d4d4d4 100%) !important; }
 .scene { width:min(100%, 940px); padding:clamp(14px, 3vw, 30px); }
-.radio-wrapper { width:min(860px, 100%); height:auto; aspect-ratio:860 / 265; filter:drop-shadow(0 24px 24px rgba(0,0,0,.55)); }
+.radio-wrapper { width:min(860px, 100%); height:auto; aspect-ratio:860 / 265; }
 .radio-img { height:100%; box-shadow:inset 0 1px rgba(255,255,255,.08), 0 1px 0 rgba(255,255,255,.05); }
 .radio-img { filter:hue-rotate(var(--accent-hue)); transition:filter .35s ease; }
 .radio-wrapper::after { content:""; position:absolute; inset:0; pointer-events:none; border-radius:7px; background:linear-gradient(112deg,rgba(255,255,255,.09),transparent 18%,transparent 76%,rgba(0,0,0,.3)); mix-blend-mode:screen; }
@@ -457,7 +457,8 @@ body.light .pl-panel.is-collapsed { background:transparent; border-color:transpa
 .chip:hover,.chip.on { border-color:var(--accent); color:var(--accent); }
 .chip.on { background:rgba(var(--accent-rgb),.08); box-shadow:0 0 7px rgba(var(--accent-rgb),.32); }
 .trow:hover,.trow.on { background:rgba(var(--accent-rgb),.08); }
-.trow.on .tn,.teb { color:var(--accent); background-color:var(--accent); }
+.trow.on .tn { color:var(--accent); background-color:transparent; }
+.teb { background-color:var(--accent); }
 body.light .pl-panel { border-color:rgba(var(--accent-rgb),.35); }
 body.light .pt,body.light .p-exit,body.light .panel-toggle,body.light .chip { color:var(--accent-dim); }
 body.light .pl-line { background:linear-gradient(90deg,var(--accent-dim),transparent); }
@@ -546,14 +547,107 @@ body.light .settings-scale { color:#444; }
 body.light .scale-controls button { background:linear-gradient(#fff,#ddd); border-color:#aaa; color:#444; }
 body.light .scale-controls output { color:#444; }
 .pl-panel.auth-mode,.pl-panel.is-collapsed { width:auto; }
+.pl-panel.is-collapsed { display:none; }
 
 /* LCD mode lamps match the size and illuminated feel of PLAYING. */
 .lcd .lcd-mode-icon { width:1.5cqw; height:1.5cqw; flex-basis:1.5cqw; }
 .lcd .lcd-bt-icon { width:1.38cqw; height:1.38cqw; flex-basis:1.38cqw; }
 .lcd .icons svg { filter:drop-shadow(0 0 2px rgba(var(--accent-rgb),.95)) drop-shadow(0 0 5px rgba(var(--accent-rgb),.55)); }
 
+/* Bluetooth pulses while the Spotify connection flow is being opened. */
+.lcd .lcd-bt-icon.pairing { animation:bt-pairing .7s ease-in-out infinite alternate; }
+@keyframes bt-pairing { from { opacity:.18; filter:drop-shadow(0 0 1px rgba(var(--accent-rgb),.35)); } to { opacity:1; filter:drop-shadow(0 0 3px rgba(var(--accent-rgb),1)) drop-shadow(0 0 8px rgba(var(--accent-rgb),.7)); } }
+
 /* Slightly lower the scrolling song title without losing descender clearance. */
 .lcd .title { top:.36cqw; }
 
 /* Center mode icons on the exact status lane used by PLAYING. */
 .lcd .icons { top:0; height:15%; align-items:center; }
+
+/* Side-by-side Spotify library: playlists select the tracks on the right. */
+.library-layout { display:grid; grid-template-columns:minmax(190px,.78fr) minmax(0,1.22fr); gap:16px; align-items:start; }
+.playlist-column,.tracks-column { min-width:0; }
+.tracks-column { border-left:1px solid rgba(var(--accent-rgb),.34); padding-left:16px; }
+.library-layout .ph { margin-bottom:8px; }
+.chips { max-height:258px; margin:0; padding-right:5px; overflow-y:scroll; }
+.tlist { max-height:258px; min-height:258px; padding-right:4px; overflow-y:scroll; }
+.chips,.tlist { scrollbar-width:thin; scrollbar-color:var(--accent-dim) rgba(255,255,255,.055); }
+.chips::-webkit-scrollbar,.tlist::-webkit-scrollbar { width:8px; }
+.chips::-webkit-scrollbar-track,.tlist::-webkit-scrollbar-track { background:rgba(255,255,255,.055); border-radius:8px; }
+.chips::-webkit-scrollbar-thumb,.tlist::-webkit-scrollbar-thumb { background:var(--accent-dim); border:2px solid rgba(5,0,0,.8); border-radius:8px; }
+body.light .tracks-column { border-left-color:rgba(var(--accent-rgb),.42); }
+body.light .chips,body.light .tlist { scrollbar-color:var(--accent-dim) rgba(40,25,25,.11); }
+body.light .chips::-webkit-scrollbar-track,body.light .tlist::-webkit-scrollbar-track { background:rgba(40,25,25,.11); }
+body.light .chips::-webkit-scrollbar-thumb,body.light .tlist::-webkit-scrollbar-thumb { border-color:rgba(245,240,240,.94); }
+
+/* Material finish: an elliptical contact shadow plus very subtle brushed
+   surfaces keep the page tactile without competing with the radio artwork. */
+.radio-wrapper { isolation:isolate; }
+.radio-wrapper::before {
+  content:""; position:absolute; z-index:-1; pointer-events:none;
+  left:7%; right:7%; bottom:-8%; height:19%;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.44) 0%,rgba(0,0,0,.24) 35%,transparent 72%);
+  filter:blur(9px); opacity:.88;
+}
+body::before {
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(circle at 19% 24%,rgba(255,255,255,.17) 0 .55px,transparent .7px) 0 0/9px 11px,
+    radial-gradient(circle at 67% 71%,rgba(0,0,0,.28) 0 .55px,transparent .75px) 0 0/13px 9px,
+    repeating-linear-gradient(96deg,rgba(255,255,255,.013) 0 1px,rgba(0,0,0,.024) 1px 3px);
+  opacity:.38; mix-blend-mode:soft-light;
+}
+body.light::before {
+  background:
+    radial-gradient(circle at 19% 24%,rgba(55,50,48,.17) 0 .5px,transparent .72px) 0 0/9px 11px,
+    radial-gradient(circle at 67% 71%,rgba(255,255,255,.8) 0 .55px,transparent .8px) 0 0/13px 9px,
+    repeating-linear-gradient(96deg,rgba(65,60,58,.018) 0 1px,rgba(255,255,255,.06) 1px 3px);
+  opacity:.32; mix-blend-mode:multiply;
+}
+.scene { position:relative; z-index:1; }
+body.light .radio-wrapper::before { background:radial-gradient(ellipse at center,rgba(25,25,25,.28) 0%,rgba(25,25,25,.13) 40%,transparent 72%); opacity:.72; }
+.chip,.tn,.ta,.td,.tidx,#plName { font-family:"SF Pro Display","SF Pro Text",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif !important; }
+.chip { min-height:34px; padding:8px 11px; font-size:12px; font-weight:500; letter-spacing:.1px; }
+.trow { min-height:38px; padding:7px 8px; gap:8px; }
+.tn { font-size:12px; font-weight:600; }
+.ta,.td,.tidx { font-size:10px; letter-spacing:.1px; }
+#plName { max-width:47%; color:var(--accent-dim); font-size:11px; font-weight:600; letter-spacing:.1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (max-width:620px) {
+  .library-layout { grid-template-columns:1fr; gap:16px; }
+  .tracks-column { border-left:0; border-top:1px solid rgba(var(--accent-rgb),.34); padding:16px 0 0; }
+  .chips,.tlist { max-height:210px; min-height:0; }
+}
+
+/* High-contrast library text: the Spotify lists stay legible independently
+   of the selected illumination colour and of the page theme. */
+.playlist-column .chip {
+  color:#f3e9ea;
+  background:linear-gradient(90deg,rgba(255,255,255,.055),rgba(255,255,255,.018));
+}
+.tracks-column .tn { color:#f7f2f2; }
+.tracks-column .ta,
+.tracks-column .td,
+.tracks-column .tidx { color:#c8b8ba; }
+.tracks-column .trow.on .tn { color:var(--accent); }
+.tracks-column .trow.on .ta,
+.tracks-column .trow.on .td,
+.tracks-column .trow.on .tidx { color:#f0dfe1; }
+.tracks-column .trow:hover { background:rgba(255,255,255,.07); }
+.tracks-column .trow.on { background:rgba(var(--accent-rgb),.16); }
+
+body.light .playlist-column .chip {
+  color:#292123;
+  background:linear-gradient(90deg,rgba(255,255,255,.88),rgba(239,232,233,.8));
+  border-color:rgba(var(--accent-rgb),.28);
+}
+body.light .playlist-column .chip:hover { color:#161112; background:#fff; }
+body.light .playlist-column .chip.on { color:var(--accent); background:rgba(var(--accent-rgb),.13); }
+body.light .tracks-column .tn { color:#211a1b; }
+body.light .tracks-column .ta,
+body.light .tracks-column .td,
+body.light .tracks-column .tidx { color:#67575a; }
+body.light .tracks-column .trow:hover { background:rgba(30,20,20,.06); }
+body.light .tracks-column .trow.on { background:rgba(var(--accent-rgb),.13); }
+body.light .tracks-column .trow.on .ta,
+body.light .tracks-column .trow.on .td,
+body.light .tracks-column .trow.on .tidx { color:#4b3b3e; }
