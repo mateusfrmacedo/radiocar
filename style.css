@@ -83,9 +83,9 @@ body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:
   justify-content: space-between;
   padding: 5px 9px 4px 9px;
 }
-.lcd-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.92; filter:saturate(.72) contrast(1.18) brightness(.7); mix-blend-mode:screen; pointer-events:none; z-index:1; transition:opacity .35s ease,filter .35s ease; }
-.lcd:not(.screen-active) .lcd-inner { opacity:0; visibility:hidden; }
-.lcd.screen-active .lcd-video { opacity:.08; filter:saturate(.2) brightness(.25); }
+.lcd-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; filter:saturate(.72) contrast(1.18) brightness(.7); mix-blend-mode:screen; pointer-events:none; z-index:1; transition:opacity .35s ease,filter .35s ease; }
+.lcd.show-animation .lcd-video { opacity:.92; }
+.lcd.show-animation .lcd-inner { opacity:0; visibility:hidden; }
 .lcd-inner { transition:opacity .22s ease,visibility .22s step-end; }
 /* LCD typography and rows scale with the physical radio, avoiding cropped lines on narrow windows. */
 .lcd { padding:.58cqw 1.05cqw .46cqw; }
