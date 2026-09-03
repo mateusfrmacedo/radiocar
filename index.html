@@ -69,7 +69,7 @@
         </div>
         <div class="r2"><span class="title" id="lcdTitle">- - - - - - - -</span></div>
         <div class="r3" id="lcdArtist">AGUARDANDO SINAL</div>
-        <div class="r4" id="progWrap" onclick="seekTo(event)">
+        <div class="r4" id="progWrap" aria-label="Progresso da faixa">
           <div class="time-row">
             <span id="tCur">0:00</span>
             <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
@@ -93,14 +93,14 @@
     <button class="ovr o-power" onclick="doFlash(this);togglePower()"></button>
     <button class="ovr o-menu"  onclick="doFlash(this)"></button>
     <button class="ovr o-spt"   onclick="doFlash(this)"></button>
-    <button class="ovr o-back"  onclick="doFlash(this);prevTrack()"></button>
+    <button class="ovr o-back"  onclick="doFlash(this)"></button>
     <button class="ovr o-b1"    onclick="doFlash(this);prevTrack()"></button>
     <button class="ovr o-b2"    onclick="doFlash(this);nextTrack()"></button>
     <button class="ovr o-b3"    onclick="doFlash(this);toggleShuffle()"></button>
     <button class="ovr o-b4"    onclick="doFlash(this);toggleRepeat()"></button>
     <button class="ovr o-b5"    onclick="doFlash(this);showInfo()"></button>
     <button class="ovr o-b6"    onclick="doFlash(this);shareTrack()"></button>
-    <button class="ovr o-usb"   onclick="doFlash(this);showUsbInfo()"></button>
+    <button class="ovr o-usb"   onclick="doFlash(this)"></button>
     <button class="ovr o-brand" onclick="doFlash(this);toggleScreenAnimation()"></button>
   </div>
 
@@ -122,20 +122,26 @@
     </div>
 
     <div id="mainBlock" style="display:none">
-      <div class="ph">
-        <span class="pt">Playlists</span>
-        <div class="pl-line"></div>
-        <button class="p-hide" type="button" onclick="toggleLibrary(true)" aria-label="Ocultar playlists">OCULTAR</button>
-        <button class="p-exit" onclick="disconnect()">SAIR</button>
-      </div>
-      <div class="chips" id="chips"></div>
-      <div class="ph">
-        <span class="pt">Faixas</span>
-        <div class="pl-line"></div>
-        <span id="plName" style="font-family:VT323,monospace;font-size:12px;color:#280808;letter-spacing:1px;"></span>
-      </div>
-      <div class="tlist" id="tlist">
-        <div style="font-family:VT323,monospace;font-size:14px;color:#220808;padding:10px;text-align:center;letter-spacing:2px;">SELECIONE UMA PLAYLIST</div>
+      <div class="library-layout">
+        <section class="playlist-column" aria-label="Playlists">
+          <div class="ph">
+            <span class="pt">Playlists</span>
+            <div class="pl-line"></div>
+            <button class="p-hide" type="button" onclick="toggleLibrary(true)" aria-label="Ocultar playlists">OCULTAR</button>
+            <button class="p-exit" onclick="disconnect()">SAIR</button>
+          </div>
+          <div class="chips" id="chips"></div>
+        </section>
+        <section class="tracks-column" aria-label="Faixas da playlist selecionada">
+          <div class="ph">
+            <span class="pt">Faixas</span>
+            <div class="pl-line"></div>
+            <span id="plName"></span>
+          </div>
+          <div class="tlist" id="tlist">
+            <div class="system-msg">SELECIONE UMA PLAYLIST</div>
+          </div>
+        </section>
       </div>
     </div>
   </div>
@@ -146,7 +152,6 @@ let isLight=localStorage.getItem("radiocar-theme")==="light";
 let infoClockTimer=null,infoRestoreTimer=null;
 function applyTheme(){
   const b=document.getElementById("body"),label=document.getElementById("settingsTheme");
-  b.style.background=isLight?"#EDEDED":"#151515";
   b.classList.toggle("light",isLight);
   label.textContent=isLight?"LIGHT":"DARK";
 }
@@ -157,7 +162,7 @@ function toggleBg(){
 }
 
 function toggleSettings(){const menu=document.getElementById("settingsMenu"),trigger=menu.querySelector(".settings-trigger"),open=menu.classList.toggle("open");trigger.setAttribute("aria-expanded",String(open));}
-function openSpotifyControl(){if(!token){connectSpotify();return;}toggleLibrary(false);document.getElementById("plPanel").scrollIntoView({behavior:"smooth",block:"center"});}
+function openSpotifyControl(){if(!token){connectSpotify();return;}toggleLibrary();document.getElementById("plPanel").scrollIntoView({behavior:"smooth",block:"center"});}
 let playerScale=Number(localStorage.getItem("radiocar-scale"))||1;
 function applyPlayerScale(){document.documentElement.style.setProperty("--player-scale",playerScale);document.getElementById("scaleValue").textContent=`${Math.round(playerScale*100)}%`;}
 function adjustPlayerScale(delta){playerScale=Math.max(.75,Math.min(1.15,Math.round((playerScale+delta)*100)/100));localStorage.setItem("radiocar-scale",playerScale);applyPlayerScale();}
@@ -207,6 +212,16 @@ const REDIRECT=location.hostname.endsWith(".github.io")?location.origin+location
 const SCOPES="streaming user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private";
 let token=null,player=null,deviceId=null,dur=0,pos=0,isPlaying=false,shuffle=false,repeat=false,plId=null,tracks=[],poll=null,playerBooted=false,poweredOff=false,volumeUiTimer=null;
 let activeTrackIndex=-1,autoAdvancePending=false;
+let screenMode="track",screenClockTimer=null,lastDisplay={title:"- - - - - - - -",artist:"AGUARDANDO SINAL",position:0,duration:0};
+
+/* Gives the browser an active media session, so playback remains a proper
+   background media task when the user moves to another tab or application. */
+function setupMediaSession(){
+  if(!("mediaSession" in navigator))return;
+  const handlers={play:togglePlay,pause:togglePlay,previoustrack:prevTrack,nexttrack:nextTrack};
+  Object.entries(handlers).forEach(([action,handler])=>{try{navigator.mediaSession.setActionHandler(action,handler);}catch{}});
+}
+setupMediaSession();
 
 const params=new URLSearchParams(location.search);
 const savedToken=localStorage.getItem("rc_tok");
@@ -228,15 +243,17 @@ async function api(path,options={}){const headers={...(options.headers||{}),Auth
 async function connectSpotify(){
   const cid=SPOTIFY_CLIENT_ID;
   if(location.protocol==="file:"){showAuthError("Abra o RadioCar em http://127.0.0.1:5173/ para conectar o Spotify.");return;}
+  pulseBluetooth();
   localStorage.setItem("rc_cid",cid);const verifier=randomString();localStorage.setItem("rc_verifier",verifier);const auth=new URL("https://accounts.spotify.com/authorize");auth.search=new URLSearchParams({client_id:cid,response_type:"code",redirect_uri:REDIRECT,scope:SCOPES,code_challenge_method:"S256",code_challenge:await challengeFor(verifier)});location.assign(auth);
 }
+function pulseBluetooth(){const bt=document.getElementById("iBT");bt.classList.add("on","pairing");clearTimeout(pulseBluetooth.timer);pulseBluetooth.timer=setTimeout(()=>bt.classList.remove("pairing"),5000);}
 function toggleLibrary(force){const main=document.getElementById("mainBlock"),button=document.getElementById("panelToggle"),panel=document.getElementById("plPanel");const hide=typeof force==="boolean"?force:main.style.display!=="none";main.style.display=hide?"none":"block";panel.classList.toggle("is-collapsed",hide);button.textContent=hide?"MOSTRAR LISTAS":"OCULTAR LISTAS";button.setAttribute("aria-expanded",String(!hide));}
 function disconnect(){token=null;localStorage.removeItem("rc_tok");localStorage.removeItem("rc_refresh");if(player){player.disconnect();player=null;}playerBooted=false;clearInterval(poll);setDisp("- - - - - - - -","PRESSIONE SPOTIFY",0,0);setStatus(false,"OFFLINE");document.getElementById("authBlock").style.display="block";document.getElementById("mainBlock").style.display="none";document.getElementById("panelToolbar").style.display="none";document.getElementById("plPanel").classList.add("auth-mode");}
-function showMain(){document.getElementById("authBlock").style.display="none";document.getElementById("panelToolbar").style.display="flex";document.getElementById("plPanel").classList.remove("auth-mode");toggleLibrary(false);setStatus(false,"CONECTADO");loadPlaylists();startPoll();}
+function showMain(){document.getElementById("authBlock").style.display="none";document.getElementById("panelToolbar").style.display="flex";document.getElementById("plPanel").classList.remove("auth-mode");document.getElementById("mainBlock").style.display="none";document.getElementById("plPanel").classList.add("is-collapsed");setStatus(false,"CONECTADO");loadPlaylists();startPoll();}
 function bootSDK(){if(!token||playerBooted)return;playerBooted=true;const s=document.createElement("script");s.src="https://sdk.scdn.co/spotify-player.js";document.body.appendChild(s);}
 window.onSpotifyWebPlaybackSDKReady=()=>{
   player=new Spotify.Player({name:"RadioCar",volume:0.7,getOAuthToken:cb=>cb(token)});
-  player.addListener("ready",({device_id})=>{deviceId=device_id;api("/me/player",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({device_ids:[device_id],play:false})});document.getElementById("iBT").classList.add("on");});
+  player.addListener("ready",({device_id})=>{deviceId=device_id;api("/me/player",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({device_ids:[device_id],play:false})});document.getElementById("iBT").classList.add("on");document.getElementById("iBT").classList.remove("pairing");});
   player.addListener("authentication_error",()=>showAuthError("A sessão expirou. Conecte novamente."));
   player.addListener("account_error",()=>showAuthError("A reprodução no navegador exige Spotify Premium."));
   player.addListener("player_state_changed",s=>{if(!s)return;const t=s.track_window.current_track;isPlaying=!s.paused;dur=s.duration;pos=s.position;shuffle=s.shuffle;setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(isPlaying,isPlaying?"PLAYING":"PAUSE");updIco();hiTrack(t.uri);checkTrackCompletion(s.paused,s.position,s.duration);});
@@ -252,21 +269,59 @@ function onVol(v){if(poweredOff)return;v=Math.round(Number(v));rotateKnob(v);doc
 async function toggleShuffle(){if(poweredOff||!requireConnection())return;shuffle=!shuffle;updIco();await api(`/me/player/shuffle?state=${shuffle}`,{method:"PUT"});}
 async function toggleRepeat(){if(poweredOff||!requireConnection())return;repeat=!repeat;updIco();await api(`/me/player/repeat?state=${repeat?"track":"off"}`,{method:"PUT"});}
 async function seekTo(e){if(poweredOff||!requireConnection()||!dur)return;const r=e.currentTarget.getBoundingClientRect();const ms=Math.floor(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*dur);if(player){player.seek(ms);return;}await api(`/me/player/seek?position_ms=${ms}`,{method:"PUT"});}
-function showInfo(){
-  if(poweredOff)return;
+function renderScreenMode(){
   const title=document.getElementById("lcdTitle"),artist=document.getElementById("lcdArtist"),label=document.getElementById("lcdLbl");
-  const previous={title:title.textContent,titleClass:title.className,artist:artist.textContent,label:label.textContent};
-  const credit="RadioCar     create by     @mateusfrmacedo";
-  const updateClock=()=>{label.textContent=new Intl.DateTimeFormat("pt-BR",{hour:"2-digit",minute:"2-digit"}).format(new Date());};
-  clearInterval(infoClockTimer);clearTimeout(infoRestoreTimer);updateClock();
-  title.textContent=`${credit}       ${credit}`;
-  title.className="title scroll";
-  artist.textContent="";
-  infoClockTimer=setInterval(updateClock,1000);
-  infoRestoreTimer=setTimeout(()=>{clearInterval(infoClockTimer);title.textContent=previous.title;title.className=previous.titleClass;artist.textContent=previous.artist;label.textContent=previous.label;},5200);
+  clearInterval(screenClockTimer);
+  if(screenMode==="track"){setDisp(lastDisplay.title,lastDisplay.artist,lastDisplay.position,lastDisplay.duration);return;}
+  const message=screenMode==="info"?"create by mateus":"RadioCar",spacer="\u00a0".repeat(12);
+  title.className="title scroll";artist.textContent="";
+  const updateClock=()=>{const now=new Date(),time=new Intl.DateTimeFormat("pt-BR",{hour:"2-digit",minute:"2-digit"}).format(now);label.textContent=time;const sequence=screenMode==="info"?`${message}${spacer}${time}${spacer}${new Intl.DateTimeFormat("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(now)}${spacer}`:`${message}${spacer}`;title.textContent=sequence+sequence;};
+  updateClock();screenClockTimer=setInterval(updateClock,1000);
 }
+function showInfo(){if(poweredOff)return;screenMode=screenMode==="info"?"track":"info";renderScreenMode();}
+function showMenu(){if(poweredOff)return;screenMode=screenMode==="menu"?"track":"menu";renderScreenMode();}
 function showUsbInfo(){const el=document.getElementById("lcdArtist"),o=el.textContent;el.textContent="USB: USE O SPOTIFY";setTimeout(()=>el.textContent=o,2200);}
-function shareTrack(){const t=document.getElementById("lcdTitle").textContent,a=document.getElementById("lcdArtist").textContent;if(!t.startsWith("-")&&navigator.clipboard){navigator.clipboard.writeText(t+" - "+a);const el=document.getElementById("lcdLbl"),o=el.textContent;el.textContent="COPIADO";setTimeout(()=>el.textContent=o,2000);}}
+let captureLibraryPromise=null;
+function loadCaptureLibrary(){
+  if(window.html2canvas)return Promise.resolve(window.html2canvas);
+  if(captureLibraryPromise)return captureLibraryPromise;
+  captureLibraryPromise=new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";script.onload=()=>resolve(window.html2canvas);script.onerror=()=>reject(new Error("Não foi possível carregar o gerador de imagem."));document.head.appendChild(script);});
+  return captureLibraryPromise;
+}
+function showShareStatus(text){const el=document.getElementById("lcdLbl"),previous=el.textContent;el.textContent=text;clearTimeout(showShareStatus.timer);showShareStatus.timer=setTimeout(()=>{if(screenMode==="track")el.textContent=previous;},2400);}
+function drawCurrentTrackOnCapture(canvas,element){
+  const ctx=canvas.getContext("2d"),scale=canvas.width/element.clientWidth,w=canvas.width,h=canvas.height;
+  const title=lastDisplay.title!=="- - - - - - - -"?lastDisplay.title:"RadioCar",artist=lastDisplay.artist||"Spotify";
+  const x=w*.438,y=h*.334,boxW=w*.398,boxH=h*.26,pad=9*scale;
+  const trim=(text,max)=>{const original=text;while(ctx.measureText(text).width>max&&text.length>1)text=text.slice(0,-2);return text.length<original.length?text.trimEnd()+"…":text;};
+  ctx.save();ctx.fillStyle="rgba(7,0,0,.82)";ctx.fillRect(x,y,boxW,boxH);ctx.strokeStyle="rgba(255,60,25,.32)";ctx.lineWidth=scale;ctx.strokeRect(x,y,boxW,boxH);
+  ctx.fillStyle=getComputedStyle(document.body).getPropertyValue("--accent").trim()||"#ff3018";ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=5*scale;
+  ctx.font=`${18*scale}px monospace`;ctx.fillText(trim(title,boxW-pad*2),x+pad,y+boxH*.48);
+  ctx.globalAlpha=.82;ctx.font=`${9.5*scale}px sans-serif`;ctx.fillText(trim(artist,boxW-pad*2),x+pad,y+boxH*.76);ctx.restore();
+}
+async function shareTrack(){
+  const playerElement=document.getElementById("rw"),siteUrl=location.origin+location.pathname;
+  try{
+    showShareStatus("GERANDO IMAGEM");
+    await document.fonts?.ready;
+    const html2canvas=await loadCaptureLibrary();
+    const canvas=await html2canvas(playerElement,{backgroundColor:null,scale:2,useCORS:true,logging:false});
+    drawCurrentTrackOnCapture(canvas,playerElement);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+    if(!blob)throw new Error("Não foi possível criar a imagem.");
+    const file=new File([blob],"radiocar-player.png",{type:"image/png"});
+    const track=lastDisplay.title!=="- - - - - - - -"?`${lastDisplay.title} — ${lastDisplay.artist}`:"RadioCar";
+    if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+      await navigator.share({title:"RadioCar",text:track,url:siteUrl,files:[file]});
+      showShareStatus("COMPARTILHADO");
+      return;
+    }
+    const download=URL.createObjectURL(blob),link=document.createElement("a");
+    link.href=download;link.download="radiocar-player.png";link.click();setTimeout(()=>URL.revokeObjectURL(download),1000);
+    if(navigator.clipboard)await navigator.clipboard.writeText(siteUrl).catch(()=>{});
+    showShareStatus("IMAGEM SALVA / LINK COPIADO");
+  }catch(error){showShareStatus("ERRO AO COMPARTILHAR");}
+}
 async function loadPlaylists(){if(!token)return;const r=await api("/me/playlists?limit=50");const row=document.getElementById("chips");if(!r||!r.ok){row.innerHTML='<div class="system-msg">NÃO FOI POSSÍVEL LER AS PLAYLISTS</div>';return;}const d=await r.json();row.innerHTML="";(d.items||[]).forEach(pl=>{const c=document.createElement("button");c.className="chip";c.textContent=pl.name;c.type="button";c.onclick=()=>loadTracks(pl.id,pl.name,c);row.appendChild(c);});if(!d.items?.length)row.innerHTML='<div class="system-msg">NENHUMA PLAYLIST DISPONÍVEL</div>';}
 async function loadTracks(id,name,chip){
   plId=id;
@@ -290,9 +345,9 @@ async function loadTracks(id,name,chip){
 }
 function renderTracks(){const list=document.getElementById("tlist");list.innerHTML="";if(!tracks.length){list.innerHTML='<div class="system-msg">SEM FAIXAS PARA TOCAR</div>';return;}tracks.forEach((t,i)=>{const el=document.createElement("div");el.className="trow";el.dataset.uri=t.uri;el.innerHTML=`<div class="tidx"><span class="tidx-n">${i+1}</span><div class="teq"><div class="teb" style="height:3px"></div><div class="teb" style="height:7px"></div><div class="teb" style="height:2px"></div></div></div><div class="tinfo"><div class="tn"></div><div class="ta"></div></div><div class="td">${ms2t(t.duration_ms)}</div>`;el.querySelector(".tn").textContent=t.name;el.querySelector(".ta").textContent=t.artists.map(a=>a.name).join(", ");el.onclick=()=>playTrack(t.uri,i);list.appendChild(el);});}
 async function playTrack(uri,idx){if(!token)return;activeTrackIndex=idx;const body=plId?{context_uri:`spotify:playlist:${plId}`,offset:{position:idx}}:{uris:[uri]};const dev=deviceId?`?device_id=${deviceId}`:"";const r=await api(`/me/player/play${dev}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(r&&!r.ok)showAuthError("Não foi possível iniciar a reprodução neste dispositivo.");}
-function setDisp(title,artist,p,d){const el=document.getElementById("lcdTitle"),artistLine=document.getElementById("lcdArtist"),isTrack=title!=="- - - - - - - -";const marquee=isTrack?`${title}     -     ${artist}`:title;el.textContent=isTrack?marquee+"       "+marquee:marquee;el.className="title"+(isTrack?" scroll":"");artistLine.textContent=isTrack?"":artist.toUpperCase();document.getElementById("tCur").textContent=ms2t(p);document.getElementById("tTot").textContent=ms2t(d);dur=d;pos=p;updProg();}
+function setDisp(title,artist,p,d){lastDisplay={title,artist,position:p,duration:d};if("mediaSession" in navigator&&window.MediaMetadata&&title!=="- - - - - - - -")navigator.mediaSession.metadata=new MediaMetadata({title,artist,album:"RadioCar"});if(screenMode!=="track")return;const el=document.getElementById("lcdTitle"),artistLine=document.getElementById("lcdArtist"),isTrack=title!=="- - - - - - - -";const marquee=isTrack?`${title}     -     ${artist}`:title;el.textContent=isTrack?marquee+"       "+marquee:marquee;el.className="title"+(isTrack?" scroll":"");artistLine.textContent=isTrack?"":artist.toUpperCase();document.getElementById("tCur").textContent=ms2t(p);document.getElementById("tTot").textContent=ms2t(d);dur=d;pos=p;updProg();}
 function updProg(){if(!dur)return;document.getElementById("progFill").style.width=(pos/dur*100)+"%";}
-function setStatus(on,txt){document.getElementById("led").className="led"+(on?"":" off");document.getElementById("lcdLbl").textContent=txt;isPlaying=on;}
+function setStatus(on,txt){document.getElementById("led").className="led"+(on?"":" off");if("mediaSession" in navigator)navigator.mediaSession.playbackState=on?"playing":"paused";if(screenMode==="track")document.getElementById("lcdLbl").textContent=txt;isPlaying=on;}
 function updIco(){const sh=document.getElementById("iShuffle"),rp=document.getElementById("iRepeat");sh.className="ico lcd-mode-icon"+(shuffle?" on":"");rp.className="ico lcd-mode-icon"+(repeat?" on":"");sh.setAttribute("aria-label",shuffle?"Shuffle ativado":"Shuffle desativado");rp.setAttribute("aria-label",repeat?"Repetição ativada":"Repetição desativada");}
 function hiTrack(uri){const found=tracks.findIndex(track=>track.uri===uri);if(found>=0)activeTrackIndex=found;document.querySelectorAll(".trow").forEach(el=>el.classList.toggle("on",el.dataset.uri===uri));}
 function checkTrackCompletion(paused,current,duration){
@@ -313,11 +368,15 @@ document.querySelectorAll(".ovr").forEach(control=>{
   control.addEventListener("pointerdown",()=>{if(!control.classList.contains("o-brand"))stopScreenAnimation();control.classList.add("is-pressed");if(navigator.vibrate)navigator.vibrate(8);});
   ["pointerup","pointercancel","pointerleave"].forEach(type=>control.addEventListener(type,()=>control.classList.remove("is-pressed")));
 });
-function openLibrary(){if(token)toggleLibrary(false);document.getElementById("plPanel").scrollIntoView({behavior:"smooth",block:"center"});}
+let listHoldTimer=null,listHoldTriggered=false;
+function toggleLibraryFromList(){if(listHoldTriggered)return;if(!token){openSpotifyControl();return;}toggleLibrary();document.getElementById("plPanel").scrollIntoView({behavior:"smooth",block:"center"});}
 document.querySelector(".o-spt").addEventListener("click",openSpotifyControl);
-document.querySelector(".o-menu").addEventListener("click",openLibrary);
-Object.entries({".o-play":"Tocar ou pausar",".o-power":"Ligar ou desligar",".o-menu":"Abrir playlists",".o-spt":"Conectar Spotify",".o-back":"Faixa anterior",".o-b1":"Faixa anterior",".o-b2":"Próxima faixa",".o-b3":"Alternar aleatório",".o-b4":"Alternar repetição",".o-b5":"Informações da faixa",".o-b6":"Copiar informações da faixa",".o-usb":"Informações da entrada USB",".o-brand":"Alternar animação da tela"}).forEach(([selector,label])=>document.querySelector(selector).setAttribute("aria-label",label));
-document.addEventListener("pointerdown",event=>{if(event.target.closest(".o-brand"))return;if(event.target.closest("button, input, .r4, .trow"))stopScreenAnimation();});
+const listControl=document.querySelector(".o-menu");
+listControl.addEventListener("click",toggleLibraryFromList);
+listControl.addEventListener("pointerdown",()=>{listHoldTriggered=false;clearTimeout(listHoldTimer);listHoldTimer=setTimeout(()=>{listHoldTriggered=true;showMenu();},650);});
+["pointerup","pointercancel","pointerleave"].forEach(type=>listControl.addEventListener(type,()=>clearTimeout(listHoldTimer)));
+Object.entries({".o-play":"Tocar ou pausar",".o-power":"Ligar ou desligar",".o-menu":"Mostrar ou ocultar playlists; segure para Menu",".o-spt":"Conectar Spotify",".o-back":"Voltar",".o-b1":"Faixa anterior",".o-b2":"Próxima faixa",".o-b3":"Alternar aleatório",".o-b4":"Alternar repetição",".o-b5":"Informações do RadioCar",".o-b6":"Copiar informações da faixa",".o-usb":"Entrada USB",".o-brand":"Alternar animação da tela"}).forEach(([selector,label])=>document.querySelector(selector).setAttribute("aria-label",label));
+document.addEventListener("pointerdown",event=>{if(event.target.closest(".o-brand"))return;if(event.target.closest("button, input, .trow"))stopScreenAnimation();});
 </script>
 </body>
 </html>
