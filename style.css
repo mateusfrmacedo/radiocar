@@ -357,7 +357,7 @@ body.light .td { color:#886666; }
 body { background: radial-gradient(circle at 50% 15%, #2d2d2d 0, #151515 43%, #0a0a0a 100%); }
 body.light { background: radial-gradient(circle at 50% 15%, #fff 0, #e9e9e9 48%, #d4d4d4 100%) !important; }
 .scene { width:min(100%, 940px); padding:clamp(14px, 3vw, 30px); }
-.radio-wrapper { width:min(860px, 100%); height:auto; aspect-ratio:860 / 265; filter:drop-shadow(0 24px 24px rgba(0,0,0,.55)); }
+.radio-wrapper { width:min(860px, 100%); height:auto; aspect-ratio:860 / 265; }
 .radio-img { height:100%; box-shadow:inset 0 1px rgba(255,255,255,.08), 0 1px 0 rgba(255,255,255,.05); }
 .radio-img { filter:hue-rotate(var(--accent-hue)); transition:filter .35s ease; }
 .radio-wrapper::after { content:""; position:absolute; inset:0; pointer-events:none; border-radius:7px; background:linear-gradient(112deg,rgba(255,255,255,.09),transparent 18%,transparent 76%,rgba(0,0,0,.3)); mix-blend-mode:screen; }
@@ -547,6 +547,7 @@ body.light .settings-scale { color:#444; }
 body.light .scale-controls button { background:linear-gradient(#fff,#ddd); border-color:#aaa; color:#444; }
 body.light .scale-controls output { color:#444; }
 .pl-panel.auth-mode,.pl-panel.is-collapsed { width:auto; }
+.pl-panel.is-collapsed { display:none; }
 
 /* LCD mode lamps match the size and illuminated feel of PLAYING. */
 .lcd .lcd-mode-icon { width:1.5cqw; height:1.5cqw; flex-basis:1.5cqw; }
@@ -578,6 +579,33 @@ body.light .tracks-column { border-left-color:rgba(var(--accent-rgb),.42); }
 body.light .chips,body.light .tlist { scrollbar-color:var(--accent-dim) rgba(40,25,25,.11); }
 body.light .chips::-webkit-scrollbar-track,body.light .tlist::-webkit-scrollbar-track { background:rgba(40,25,25,.11); }
 body.light .chips::-webkit-scrollbar-thumb,body.light .tlist::-webkit-scrollbar-thumb { border-color:rgba(245,240,240,.94); }
+
+/* Material finish: an elliptical contact shadow plus very subtle brushed
+   surfaces keep the page tactile without competing with the radio artwork. */
+.radio-wrapper { isolation:isolate; }
+.radio-wrapper::before {
+  content:""; position:absolute; z-index:-1; pointer-events:none;
+  left:7%; right:7%; bottom:-8%; height:19%;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.44) 0%,rgba(0,0,0,.24) 35%,transparent 72%);
+  filter:blur(9px); opacity:.88;
+}
+body::before {
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(circle at 19% 24%,rgba(255,255,255,.17) 0 .55px,transparent .7px) 0 0/9px 11px,
+    radial-gradient(circle at 67% 71%,rgba(0,0,0,.28) 0 .55px,transparent .75px) 0 0/13px 9px,
+    repeating-linear-gradient(96deg,rgba(255,255,255,.013) 0 1px,rgba(0,0,0,.024) 1px 3px);
+  opacity:.38; mix-blend-mode:soft-light;
+}
+body.light::before {
+  background:
+    radial-gradient(circle at 19% 24%,rgba(55,50,48,.17) 0 .5px,transparent .72px) 0 0/9px 11px,
+    radial-gradient(circle at 67% 71%,rgba(255,255,255,.8) 0 .55px,transparent .8px) 0 0/13px 9px,
+    repeating-linear-gradient(96deg,rgba(65,60,58,.018) 0 1px,rgba(255,255,255,.06) 1px 3px);
+  opacity:.32; mix-blend-mode:multiply;
+}
+.scene { position:relative; z-index:1; }
+body.light .radio-wrapper::before { background:radial-gradient(ellipse at center,rgba(25,25,25,.28) 0%,rgba(25,25,25,.13) 40%,transparent 72%); opacity:.72; }
 .chip,.tn,.ta,.td,.tidx,#plName { font-family:"SF Pro Display","SF Pro Text",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif !important; }
 .chip { min-height:34px; padding:8px 11px; font-size:12px; font-weight:500; letter-spacing:.1px; }
 .trow { min-height:38px; padding:7px 8px; gap:8px; }

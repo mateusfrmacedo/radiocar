@@ -152,7 +152,6 @@ let isLight=localStorage.getItem("radiocar-theme")==="light";
 let infoClockTimer=null,infoRestoreTimer=null;
 function applyTheme(){
   const b=document.getElementById("body"),label=document.getElementById("settingsTheme");
-  b.style.background=isLight?"#EDEDED":"#151515";
   b.classList.toggle("light",isLight);
   label.textContent=isLight?"LIGHT":"DARK";
 }
@@ -274,15 +273,55 @@ function renderScreenMode(){
   const title=document.getElementById("lcdTitle"),artist=document.getElementById("lcdArtist"),label=document.getElementById("lcdLbl");
   clearInterval(screenClockTimer);
   if(screenMode==="track"){setDisp(lastDisplay.title,lastDisplay.artist,lastDisplay.position,lastDisplay.duration);return;}
-  const message=screenMode==="info"?"create by mateus":"RadioCar";
-  title.textContent=`${message}${"\u00a0".repeat(12)}${message}`;title.className="title scroll";artist.textContent="";
-  const updateClock=()=>{label.textContent=new Intl.DateTimeFormat("pt-BR",{hour:"2-digit",minute:"2-digit"}).format(new Date());};
+  const message=screenMode==="info"?"create by mateus":"RadioCar",spacer="\u00a0".repeat(12);
+  title.className="title scroll";artist.textContent="";
+  const updateClock=()=>{const now=new Date(),time=new Intl.DateTimeFormat("pt-BR",{hour:"2-digit",minute:"2-digit"}).format(now);label.textContent=time;const sequence=screenMode==="info"?`${message}${spacer}${time}${spacer}${new Intl.DateTimeFormat("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}).format(now)}${spacer}`:`${message}${spacer}`;title.textContent=sequence+sequence;};
   updateClock();screenClockTimer=setInterval(updateClock,1000);
 }
 function showInfo(){if(poweredOff)return;screenMode=screenMode==="info"?"track":"info";renderScreenMode();}
 function showMenu(){if(poweredOff)return;screenMode=screenMode==="menu"?"track":"menu";renderScreenMode();}
 function showUsbInfo(){const el=document.getElementById("lcdArtist"),o=el.textContent;el.textContent="USB: USE O SPOTIFY";setTimeout(()=>el.textContent=o,2200);}
-function shareTrack(){const t=document.getElementById("lcdTitle").textContent,a=document.getElementById("lcdArtist").textContent;if(!t.startsWith("-")&&navigator.clipboard){navigator.clipboard.writeText(t+" - "+a);const el=document.getElementById("lcdLbl"),o=el.textContent;el.textContent="COPIADO";setTimeout(()=>el.textContent=o,2000);}}
+let captureLibraryPromise=null;
+function loadCaptureLibrary(){
+  if(window.html2canvas)return Promise.resolve(window.html2canvas);
+  if(captureLibraryPromise)return captureLibraryPromise;
+  captureLibraryPromise=new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";script.onload=()=>resolve(window.html2canvas);script.onerror=()=>reject(new Error("Não foi possível carregar o gerador de imagem."));document.head.appendChild(script);});
+  return captureLibraryPromise;
+}
+function showShareStatus(text){const el=document.getElementById("lcdLbl"),previous=el.textContent;el.textContent=text;clearTimeout(showShareStatus.timer);showShareStatus.timer=setTimeout(()=>{if(screenMode==="track")el.textContent=previous;},2400);}
+function drawCurrentTrackOnCapture(canvas,element){
+  const ctx=canvas.getContext("2d"),scale=canvas.width/element.clientWidth,w=canvas.width,h=canvas.height;
+  const title=lastDisplay.title!=="- - - - - - - -"?lastDisplay.title:"RadioCar",artist=lastDisplay.artist||"Spotify";
+  const x=w*.438,y=h*.334,boxW=w*.398,boxH=h*.26,pad=9*scale;
+  const trim=(text,max)=>{const original=text;while(ctx.measureText(text).width>max&&text.length>1)text=text.slice(0,-2);return text.length<original.length?text.trimEnd()+"…":text;};
+  ctx.save();ctx.fillStyle="rgba(7,0,0,.82)";ctx.fillRect(x,y,boxW,boxH);ctx.strokeStyle="rgba(255,60,25,.32)";ctx.lineWidth=scale;ctx.strokeRect(x,y,boxW,boxH);
+  ctx.fillStyle=getComputedStyle(document.body).getPropertyValue("--accent").trim()||"#ff3018";ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=5*scale;
+  ctx.font=`${18*scale}px monospace`;ctx.fillText(trim(title,boxW-pad*2),x+pad,y+boxH*.48);
+  ctx.globalAlpha=.82;ctx.font=`${9.5*scale}px sans-serif`;ctx.fillText(trim(artist,boxW-pad*2),x+pad,y+boxH*.76);ctx.restore();
+}
+async function shareTrack(){
+  const playerElement=document.getElementById("rw"),siteUrl=location.origin+location.pathname;
+  try{
+    showShareStatus("GERANDO IMAGEM");
+    await document.fonts?.ready;
+    const html2canvas=await loadCaptureLibrary();
+    const canvas=await html2canvas(playerElement,{backgroundColor:null,scale:2,useCORS:true,logging:false});
+    drawCurrentTrackOnCapture(canvas,playerElement);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+    if(!blob)throw new Error("Não foi possível criar a imagem.");
+    const file=new File([blob],"radiocar-player.png",{type:"image/png"});
+    const track=lastDisplay.title!=="- - - - - - - -"?`${lastDisplay.title} — ${lastDisplay.artist}`:"RadioCar";
+    if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+      await navigator.share({title:"RadioCar",text:track,url:siteUrl,files:[file]});
+      showShareStatus("COMPARTILHADO");
+      return;
+    }
+    const download=URL.createObjectURL(blob),link=document.createElement("a");
+    link.href=download;link.download="radiocar-player.png";link.click();setTimeout(()=>URL.revokeObjectURL(download),1000);
+    if(navigator.clipboard)await navigator.clipboard.writeText(siteUrl).catch(()=>{});
+    showShareStatus("IMAGEM SALVA / LINK COPIADO");
+  }catch(error){showShareStatus("ERRO AO COMPARTILHAR");}
+}
 async function loadPlaylists(){if(!token)return;const r=await api("/me/playlists?limit=50");const row=document.getElementById("chips");if(!r||!r.ok){row.innerHTML='<div class="system-msg">NÃO FOI POSSÍVEL LER AS PLAYLISTS</div>';return;}const d=await r.json();row.innerHTML="";(d.items||[]).forEach(pl=>{const c=document.createElement("button");c.className="chip";c.textContent=pl.name;c.type="button";c.onclick=()=>loadTracks(pl.id,pl.name,c);row.appendChild(c);});if(!d.items?.length)row.innerHTML='<div class="system-msg">NENHUMA PLAYLIST DISPONÍVEL</div>';}
 async function loadTracks(id,name,chip){
   plId=id;
