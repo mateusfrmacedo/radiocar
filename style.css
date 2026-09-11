@@ -203,8 +203,8 @@ body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:
 /* Compact settings control: gear button with a raised, self-contained panel. */
 .settings-menu { position:fixed; left:22px; bottom:18px; z-index:100; display:flex; align-items:center; gap:8px; font-family:"Share Tech Mono",monospace; }
 .settings-trigger { width:34px; height:34px; display:grid; place-items:center; border:1px solid #3d3d3d; border-radius:50%; background:linear-gradient(#404040,#171717); color:#bbb; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.16),inset 0 -2px 3px rgba(0,0,0,.55),0 2px 5px rgba(0,0,0,.5); transition:transform .14s ease,filter .14s ease; }
-.settings-trigger svg { width:18px; height:18px; fill:currentColor; transition:transform .28s ease; }
-.settings-menu.open .settings-trigger svg { transform:rotate(55deg); }
+.settings-trigger img { width:19px; height:19px; object-fit:contain; filter:invert(.8); opacity:.88; transition:transform .28s ease,filter .2s ease; }
+.settings-menu.open .settings-trigger img { transform:rotate(55deg); filter:invert(1); }
 .settings-trigger:active { transform:translateY(1px) scale(.96); filter:brightness(.78); box-shadow:inset 0 2px 5px #000; }
 .settings-spotify { width:34px; height:34px; display:grid; place-items:center; border:1px solid #196b35; border-radius:50%; background:linear-gradient(#32c764,#15843f); color:#071b0e; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.42),inset 0 -2px 3px rgba(0,0,0,.28),0 2px 5px rgba(0,0,0,.5); transition:transform .14s ease,filter .14s ease; }
 .settings-spotify svg { width:20px; height:20px; fill:currentColor; }
