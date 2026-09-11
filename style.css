@@ -88,7 +88,13 @@ body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:
 }
 .lcd-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; filter:saturate(.72) contrast(1.18) brightness(.7); mix-blend-mode:screen; pointer-events:none; z-index:1; transition:opacity .35s ease,filter .35s ease; }
 .lcd.show-animation .lcd-video.is-active { opacity:.92; }
-.lcd.show-animation .lcd-inner { opacity:0; visibility:hidden; }
+.lcd-spectrum { position:absolute; inset:0; z-index:2; isolation:isolate; display:flex; align-items:flex-end; gap:.34cqw; padding:.7cqw 1.15cqw .65cqw; overflow:hidden; opacity:0; visibility:hidden; pointer-events:none; background:linear-gradient(180deg,rgba(0,0,0,.16),rgba(0,0,0,.64)),repeating-linear-gradient(0deg,transparent 0 .48cqw,rgba(var(--accent-rgb),.09) .5cqw .56cqw); box-shadow:inset 0 0 1.5cqw rgba(0,0,0,.9); transition:opacity .24s ease,visibility .24s step-end; }
+.lcd-spectrum::before { content:""; position:absolute; z-index:3; inset:0; pointer-events:none; background:linear-gradient(112deg,rgba(255,255,255,.1),transparent 16% 68%,rgba(255,255,255,.025)),repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px); opacity:.72; }
+.lcd-spectrum::after { content:""; position:absolute; z-index:0; inset:0; background:radial-gradient(ellipse at 50% 100%,rgba(var(--accent-rgb),.25),transparent 66%); mix-blend-mode:screen; }
+.lcd-spectrum span { position:relative; z-index:1; flex:1 1 0; min-width:0; height:32%; border-radius:.16cqw .16cqw 0 0; background:repeating-linear-gradient(to top,var(--accent) 0 .26cqw,rgba(var(--accent-rgb),.34) .27cqw .37cqw,transparent .38cqw .54cqw),linear-gradient(to top,rgba(var(--accent-rgb),.25),var(--accent)); box-shadow:0 0 .4cqw rgba(var(--accent-rgb),.52),0 0 1cqw rgba(var(--accent-rgb),.14); transition:height .2s cubic-bezier(.22,.65,.26,1); }
+.lcd.show-spectrum { background:#080303; }
+.lcd.show-spectrum .lcd-spectrum { opacity:1; visibility:visible; }
+.lcd.show-animation .lcd-inner, .lcd.show-spectrum .lcd-inner { opacity:0; visibility:hidden; }
 .lcd-inner { transition:opacity .22s ease,visibility .22s step-end; }
 /* LCD typography and rows scale with the physical radio, avoiding cropped lines on narrow windows. */
 .lcd { padding:.58cqw 1.05cqw .46cqw; }
@@ -206,6 +212,8 @@ body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:
 .settings-popup { position:absolute; left:0; bottom:44px; width:154px; padding:9px; border:1px solid #3d3d3d; border-radius:8px; background:linear-gradient(145deg,rgba(48,48,48,.98),rgba(14,14,14,.98)); box-shadow:inset 0 1px rgba(255,255,255,.15),0 8px 22px rgba(0,0,0,.55); opacity:0; visibility:hidden; transform:translateY(5px) scale(.96); transform-origin:left bottom; transition:opacity .16s ease,transform .16s ease,visibility .16s step-end; }
 .settings-menu.open .settings-popup { opacity:1; visibility:visible; transform:translateY(0) scale(1); transition:opacity .16s ease,transform .16s ease; }
 .settings-theme { width:100%; display:flex; align-items:center; justify-content:center; border:1px solid #515151; border-radius:5px; background:linear-gradient(#3d3d3d,#202020); color:#aaa; padding:6px 7px; font:inherit; font-size:10px; letter-spacing:1.2px; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.12),inset 0 -1px rgba(0,0,0,.6); }
+.settings-pip,.settings-mic { width:100%; margin-top:7px; border:1px solid #515151; border-radius:5px; background:linear-gradient(#3d3d3d,#202020); color:#e2e2e2; padding:6px 7px; font:10px "Share Tech Mono",monospace; letter-spacing:1.2px; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.12),inset 0 -1px rgba(0,0,0,.6); }
+.settings-pip:active,.settings-mic:active { transform:translateY(1px); box-shadow:inset 0 1px 4px #000; }
 .settings-theme:active { transform:translateY(1px); box-shadow:inset 0 1px 4px #000; }
 .settings-theme strong { color:#e2e2e2; font:inherit; }
 .settings-colors { display:flex; align-items:center; justify-content:space-between; margin-top:9px; color:#888; font-size:10px; letter-spacing:1.2px; }
@@ -213,6 +221,7 @@ body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:
 .settings-dots .accent-dot { width:14px; height:14px; flex-basis:14px; }
 body.light .settings-popup { background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(220,220,220,.98)); border-color:#aaa; }
 body.light .settings-theme { background:linear-gradient(#fff,#ddd); border-color:#aaa; color:#555; }
+body.light .settings-pip,body.light .settings-mic { background:linear-gradient(#fff,#ddd); border-color:#aaa; color:#444; }
 body.light .settings-theme strong,body.light .settings-colors { color:#444; }
 /* Connection now lives beside the gear, leaving no duplicate call-to-action below the radio. */
 .pl-panel.auth-mode { display:none; }
