@@ -36,7 +36,6 @@
     <button class="settings-theme" type="button" onclick="toggleBg()"><strong id="settingsTheme">DARK</strong></button>
     <button class="settings-pip" id="pipButton" type="button" onclick="togglePlayerPip()">PIP</button>
     <button class="settings-mic" id="micEqButton" type="button" onclick="toggleMicEq()">MIC EQ</button>
-    <label class="settings-pip-rate" for="pipRefreshRate"><span>PIP SYNC</span><select id="pipRefreshRate" onchange="setPipRefreshRate(this.value)"><option value="350">350 ms</option><option value="700">700 ms</option><option value="1000">1 s</option></select></label>
     <div class="settings-scale">
       <span>SIZE</span>
       <div class="scale-controls">
@@ -194,9 +193,8 @@ function openSpotifyControl(){if(!token){connectSpotify();return;}toggleLibrary(
 let playerScale=Number(localStorage.getItem("radiocar-scale"))||1;
 function applyPlayerScale(){document.documentElement.style.setProperty("--player-scale",playerScale);document.getElementById("scaleValue").textContent=`${Math.round(playerScale*100)}%`;}
 function adjustPlayerScale(delta){playerScale=Math.max(.75,Math.min(1.15,Math.round((playerScale+delta)*100)/100));localStorage.setItem("radiocar-scale",playerScale);applyPlayerScale();}
-let pipWindow=null,pipSyncTimer=null,pipRefreshMs=Number(localStorage.getItem("radiocar-pip-refresh"))||700;
-function applyPipRefreshRate(){const select=document.getElementById("pipRefreshRate");if(select)select.value=String(pipRefreshMs);}
-function setPipRefreshRate(value){pipRefreshMs=Number(value);localStorage.setItem("radiocar-pip-refresh",String(pipRefreshMs));if(pipWindow&&!pipWindow.closed){clearInterval(pipSyncTimer);pipSyncTimer=setInterval(syncPlayerPip,pipRefreshMs);}}
+const pipRefreshMs=350;
+let pipWindow=null,pipSyncTimer=null;
 function syncPlayerPip(){
   if(!pipWindow||pipWindow.closed){clearInterval(pipSyncTimer);pipSyncTimer=null;pipWindow=null;document.getElementById("pipButton").textContent="PIP";return;}
   const source=document.getElementById("rw"),clone=pipWindow.document.getElementById("rw-pip");if(!source||!clone)return;
@@ -223,7 +221,7 @@ async function togglePlayerPip(){
   if(!("documentPictureInPicture" in window)){showShareStatus("PIP COMPLETO DISPONIVEL NO CHROME");return;}
   try{
     pipWindow=await window.documentPictureInPicture.requestWindow({width:860,height:265});
-    pipWindow.document.head.innerHTML='<meta charset="UTF-8"><link rel="stylesheet" href="style.css"><style>html,body{margin:0!important;min-height:0!important;background:#000!important;overflow:hidden!important}.scene{padding:0!important;gap:0!important}.settings-menu,.pl-panel{display:none!important}.radio-wrapper{width:100vw!important;height:calc(100vw * 265 / 860)!important;max-height:100vh!important;transform:none!important}.radio-wrapper::before{display:none!important}</style>';
+    pipWindow.document.head.innerHTML='<meta charset="UTF-8"><link rel="stylesheet" href="style.css"><style>html,body{width:100%!important;height:100%!important;margin:0!important;min-height:0!important;background:#000!important;overflow:hidden!important}.scene,#pipHost{width:100%!important;height:100%!important;padding:0!important;gap:0!important;display:grid!important;place-items:center!important}.settings-menu,.pl-panel{display:none!important}.radio-wrapper{width:min(100vw,calc(100vh * 860 / 265))!important;height:auto!important;aspect-ratio:860 / 265!important;max-width:100vw!important;max-height:100vh!important;flex:none!important;transform:none!important}.radio-wrapper::before{display:none!important}</style>';
     pipWindow.document.body.innerHTML='<div class="scene"><div id="pipHost"></div></div>';
     pipWindow.document.body.dataset.accent=document.body.dataset.accent||"red";
     pipWindow.document.body.classList.toggle("light",document.body.classList.contains("light"));
@@ -242,7 +240,6 @@ function setAccent(color){
 setAccent(localStorage.getItem("radiocar-accent")||"red");
 applyPlayerScale();
 applyTheme();
-applyPipRefreshRate();
 
 let nextScreenVisual=0, spectrumTimer=null, spectrumLevels=[], spectrumPeaks=[];
 let micStream=null,micContext=null,micAnalyser=null,micData=null,micFrameId=null;
@@ -384,7 +381,7 @@ const SPOTIFY_CLIENT_ID="bb679e6ebdea4e0a864c689e7ce93737";
 const REDIRECT=location.hostname.endsWith(".github.io")?location.origin+location.pathname.replace(/\/$/,""):location.href.split("?")[0].split("#")[0];
 const SCOPES="streaming user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private user-library-read";
 let token=null,player=null,deviceId=null,dur=0,pos=0,isPlaying=false,shuffle=false,repeat=false,plId=null,tracks=[],poll=null,playerBooted=false,poweredOff=false,volumeUiTimer=null,powerFxTimer=null;
-let activeTrackIndex=-1,autoAdvancePending=false;
+let activeTrackIndex=-1,autoAdvancePending=false,playbackContext="none";
 let screenMode="track",screenClockTimer=null,lastDisplay={title:"- - - - - - - -",artist:"AGUARDANDO SINAL",position:0,duration:0};
 
 /* Gives the browser an active media session, so playback remains a proper
@@ -468,9 +465,9 @@ async function prevTrack(){
 }
 async function nextTrack(){
   if(poweredOff||!requireConnection())return;
-  /* Saved tracks are sent to Spotify one URI at a time, so the SDK does not
-     have a native queue for them. Advance through the list explicitly. */
-  if(plId===null&&tracks.length&&activeTrackIndex>=0){
+  /* When the collection context is available, Spotify owns the queue. This
+     keeps next/automatic advance working even while this tab is in background. */
+  if(plId===null&&playbackContext!=="saved-collection"&&tracks.length&&activeTrackIndex>=0){
     let next=shuffle?Math.floor(Math.random()*tracks.length):(activeTrackIndex+1)%tracks.length;
     if(tracks.length>1&&next===activeTrackIndex)next=(next+1)%tracks.length;
     await playTrack(tracks[next].uri,next);
@@ -542,6 +539,7 @@ let libraryLoadId=0;
 async function loadSavedTracks(chip){
   const loadId=++libraryLoadId;
   plId=null;
+  playbackContext="none";
   document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
   chip.classList.add("on");
   document.getElementById("plName").textContent="Músicas curtidas";
@@ -569,6 +567,7 @@ async function loadSavedTracks(chip){
 async function loadTracks(id,name,chip){
   ++libraryLoadId;
   plId=id;
+  playbackContext="none";
   document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
   chip.classList.add("on");
   document.getElementById("plName").textContent=name;
@@ -603,9 +602,25 @@ async function playTrack(uri,idx){
   if(!token)return;
   if(player&&!(await activateRadioCar()))return;
   activeTrackIndex=idx;
-  const body=plId?{context_uri:`spotify:playlist:${plId}`,offset:{position:idx}}:{uris:[uri]};
   const dev=deviceId?`?device_id=${deviceId}`:"";
-  const r=await api(`/me/player/play${dev}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const start=body=>api(`/me/player/play${dev}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  let r;
+  if(plId){
+    r=await start({context_uri:`spotify:playlist:${plId}`,offset:{position:idx}});
+    playbackContext=r?.ok?"playlist":"none";
+  }else{
+    /* A collection context gives Spotify a real queue for liked songs. Unlike
+       a one-track URI request, it can change to the next track without a
+       JavaScript timer running in this tab. Older Spotify clients can reject
+       this context, so retain the single-track request as a safe fallback. */
+    r=await start({context_uri:"spotify:collection:tracks",offset:{position:idx}});
+    if(r?.ok){
+      playbackContext="saved-collection";
+    }else{
+      r=await start({uris:[uri]});
+      playbackContext=r?.ok?"saved-fallback":"none";
+    }
+  }
   if(!r||!r.ok){
     const detail=await r?.json().catch(()=>null);
     const message=detail?.error?.message||"Não foi possível iniciar a reprodução neste dispositivo.";
@@ -622,7 +637,10 @@ function setStatus(on,txt){document.getElementById("led").className="led"+(on?""
 function updIco(){const sh=document.getElementById("iShuffle"),rp=document.getElementById("iRepeat");sh.className="ico lcd-mode-icon"+(shuffle?" on":"");rp.className="ico lcd-mode-icon"+(repeat?" on":"");sh.setAttribute("aria-label",shuffle?"Shuffle ativado":"Shuffle desativado");rp.setAttribute("aria-label",repeat?"Repetição ativada":"Repetição desativada");}
 function hiTrack(uri){const found=tracks.findIndex(track=>track.uri===uri);if(found>=0)activeTrackIndex=found;document.querySelectorAll(".trow").forEach(el=>el.classList.toggle("on",el.dataset.uri===uri));}
 function checkTrackCompletion(paused,current,duration){
-  if(!paused||poweredOff||repeat||plId!==null||autoAdvancePending||!duration||current<duration-700)return;
+  /* Spotify advances playlists and the liked-songs collection itself. The
+     fallback below is solely for clients that do not accept the collection
+     context, where we still move through the loaded list. */
+  if(!paused||poweredOff||repeat||plId!==null||playbackContext==="saved-collection"||autoAdvancePending||!duration||current<duration-700)return;
   autoAdvancePending=true;
   setTimeout(async()=>{try{if(tracks.length&&activeTrackIndex>=0){let next=shuffle?Math.floor(Math.random()*tracks.length):(activeTrackIndex+1)%tracks.length;if(tracks.length>1&&next===activeTrackIndex)next=(next+1)%tracks.length;await playTrack(tracks[next].uri,next);}else if(player){await player.nextTrack();}else{await api("/me/player/next",{method:"POST"});}}finally{setTimeout(()=>autoAdvancePending=false,900);}},220);
 }

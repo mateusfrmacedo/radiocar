@@ -628,10 +628,6 @@ body.light .scale-controls output { color:#444; }
 }
 
 /* PiP refresh is configurable without rebuilding the radio face every tick. */
-.settings-pip-rate { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:8px; color:#aaa; font:9px "Share Tech Mono",monospace; letter-spacing:.7px; }
-.settings-pip-rate select { width:66px; border:1px solid #515151; border-radius:4px; background:#202020; color:#e2e2e2; padding:4px 3px; font:9px "Share Tech Mono",monospace; cursor:pointer; }
-body.light .settings-pip-rate { color:#555; }
-body.light .settings-pip-rate select { background:#eee; border-color:#aaa; color:#333; }
 
 /* Side-by-side Spotify library: playlists select the tracks on the right. */
 .library-layout { display:grid; grid-template-columns:minmax(190px,.78fr) minmax(0,1.22fr); gap:16px; align-items:start; }
