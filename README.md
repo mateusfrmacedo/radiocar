@@ -4,11 +4,6 @@
 
 Um player web inspirado em rádios automotivos clássicos. O projeto une a aparência de um painel físico — metal, LEDs, botões com profundidade e tela digital — ao controle da conta Spotify do visitante.
 
-## Acesse
-
-Após a publicação no GitHub Pages, o endereço do projeto é:
-
-`https://mateusfrmacedo.github.io/radiocar/`
 
 ## Recursos
 
