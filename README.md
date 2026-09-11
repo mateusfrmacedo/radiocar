@@ -1,5 +1,7 @@
 # RadioCar
 
+<img width="799" height="410" alt="img" src="https://github.com/user-attachments/assets/483a33c1-a947-497c-b84e-43a5f4f04e68" />
+
 Um player web inspirado em rádios automotivos clássicos. O projeto une a aparência de um painel físico — metal, LEDs, botões com profundidade e tela digital — ao controle da conta Spotify do visitante.
 
 ## Acesse
