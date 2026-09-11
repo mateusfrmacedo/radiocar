@@ -215,20 +215,12 @@ function wirePipControls(clone){
   Object.entries(actions).forEach(([selector,action])=>clone.querySelector(selector)?.addEventListener("click",event=>{event.preventDefault();action();setTimeout(syncPlayerPip,50);}));
   const knob=clone.querySelector(".o-knob"),range=clone.querySelector("#volRange");let drag=null;
   knob?.addEventListener("pointerdown",event=>{drag={id:event.pointerId,y:event.clientY,value:+range.value};knob.setPointerCapture(event.pointerId);});
-  knob?.addEventListener("pointermove",event=>{if(!drag||drag.id!==event.pointerId)return;const value=Math.max(0,Math.min(100,drag.value-(event.clientY-drag.y)*1.1));onVol(value);setTimeout(syncPlayerPip,30);});
+  knob?.addEventListener("pointermove",event=>{if(!drag||drag.id!==event.pointerId)return;const value=Math.max(0,Math.min(100,drag.value-(event.clientY-drag.y)*.4));onVol(value);setTimeout(syncPlayerPip,30);});
   ["pointerup","pointercancel"].forEach(type=>knob?.addEventListener(type,()=>drag=null));
-}
-async function toggleSafariPip(){
-  const screen=document.querySelector(".lcd"),videos=[...document.querySelectorAll(".lcd-video")];let video=videos.find(item=>item.classList.contains("is-active"))||videos[0];
-  if(!video){showShareStatus("PIP DE VIDEO INDISPONIVEL");return;}
-  if(!video.classList.contains("is-active")){videos.forEach(item=>item.classList.remove("is-active"));video.classList.add("is-active");screen?.classList.add("show-animation");await video.play().catch(()=>{});}
-  if(video.webkitSupportsPresentationMode?.("picture-in-picture")&&typeof video.webkitSetPresentationMode==="function"){video.webkitSetPresentationMode(video.webkitPresentationMode==="picture-in-picture"?"inline":"picture-in-picture");return;}
-  if(document.pictureInPictureEnabled&&video.requestPictureInPicture){try{await (document.pictureInPictureElement?document.exitPictureInPicture():video.requestPictureInPicture());}catch{showShareStatus("PIP DE VIDEO BLOQUEADO");}return;}
-  showShareStatus("PIP DE VIDEO INDISPONIVEL");
 }
 async function togglePlayerPip(){
   if(pipWindow&&!pipWindow.closed){pipWindow.close();return;}
-  if(!("documentPictureInPicture" in window)){await toggleSafariPip();return;}
+  if(!("documentPictureInPicture" in window)){showShareStatus("PIP COMPLETO DISPONIVEL NO CHROME");return;}
   try{
     pipWindow=await window.documentPictureInPicture.requestWindow({width:860,height:265});
     pipWindow.document.head.innerHTML='<meta charset="UTF-8"><link rel="stylesheet" href="style.css"><style>html,body{margin:0!important;min-height:0!important;background:#000!important;overflow:hidden!important}.scene{padding:0!important;gap:0!important}.settings-menu,.pl-panel{display:none!important}.radio-wrapper{width:100vw!important;height:calc(100vw * 265 / 860)!important;max-height:100vh!important;transform:none!important}.radio-wrapper::before{display:none!important}</style>';
@@ -288,15 +280,27 @@ function renderMicSpectrum(){
   if(spectrumLevels.length!==count)resetSpectrum();
   micAnalyser.getByteFrequencyData(micData);
   const maxBin=Math.min(micData.length-1,112);
-  bars.forEach((bar,index)=>{
+  const rawLevels=bars.map((_,index)=>{
     const start=Math.floor(2+(index/count)*(maxBin-2));
     const end=Math.max(start+1,Math.floor(2+((index+1)/count)*(maxBin-2)));
     let total=0;for(let bin=start;bin<=end;bin++)total+=micData[bin];
-    const raw=Math.min(1,(total/(end-start+1)/255)*1.6);
-    const previous=spectrumLevels[Math.max(0,index-1)]||0;
-    const next=spectrumLevels[Math.min(count-1,index+1)]||0;
-    const target=Math.max(.06,raw*.78+(previous+next)*.11);
-    spectrumLevels[index]+=(target-spectrumLevels[index])*.35;
+    return Math.min(1,(total/(end-start+1)/255)*2.65);
+  });
+  const center=(count-1)/2;
+  const centerSignal=Math.max(
+    rawLevels.reduce((sum,value)=>sum+value,0)/count,
+    rawLevels.filter((_,index)=>Math.abs(index-center)<=2).reduce((sum,value)=>sum+value,0)/5
+  );
+  const targets=rawLevels.map((raw,index)=>{
+    const centerWeight=Math.exp(-Math.pow((index-center)/(count*.23),2));
+    /* The middle acts as the main peak; its energy spreads gently outward. */
+    return Math.min(1,.035+raw*1.05+centerSignal*(.13+.62*centerWeight));
+  });
+  bars.forEach((bar,index)=>{
+    const nearby=(targets[Math.max(0,index-1)]+targets[index]+targets[Math.min(count-1,index+1)])/3;
+    const target=Math.max(.045,targets[index]*.76+nearby*.24);
+    const speed=target>(spectrumLevels[index]??0) ? .48 : .16;
+    spectrumLevels[index]+=(target-spectrumLevels[index])*speed;
     bar.style.height=`${Math.round(spectrumLevels[index]*100)}%`;
   });
   micFrameId=requestAnimationFrame(renderMicSpectrum);
@@ -316,7 +320,7 @@ async function toggleMicEq(){
     micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
     micContext=new (window.AudioContext||window.webkitAudioContext)();
     await micContext.resume();
-    micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=256;micAnalyser.smoothingTimeConstant=.72;
+    micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=512;micAnalyser.minDecibels=-95;micAnalyser.maxDecibels=-42;micAnalyser.smoothingTimeConstant=.58;
     micData=new Uint8Array(micAnalyser.frequencyBinCount);
     micContext.createMediaStreamSource(micStream).connect(micAnalyser);
     button.textContent="MIC EQ ON";
@@ -428,7 +432,7 @@ window.onSpotifyWebPlaybackSDKReady=()=>{
   player.addListener("account_error",()=>showAuthError("A reprodução no navegador exige Spotify Premium."));
   player.addListener("initialization_error",({message})=>showAuthError(`Não foi possível iniciar o player: ${message}`));
   player.addListener("playback_error",({message})=>showAuthError(`O Spotify não conseguiu tocar esta faixa: ${message}`));
-  player.addListener("player_state_changed",s=>{if(!s)return;const t=s.track_window.current_track;isPlaying=!s.paused;dur=s.duration;pos=s.position;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(isPlaying,isPlaying?"PLAYING":"PAUSE");updIco();hiTrack(t.uri);checkTrackCompletion(s.paused,s.position,s.duration);});
+  player.addListener("player_state_changed",s=>{if(!s)return;const t=s.track_window.current_track;isPlaying=!s.paused;dur=s.duration;pos=s.position;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;if(isPlaying)showTrackScreen();setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(isPlaying,isPlaying?"PLAYING":"PAUSE");updIco();hiTrack(t.uri);checkTrackCompletion(s.paused,s.position,s.duration);});
   player.connect();
 };
 function requireConnection(){if(token)return true;showAuthError("CONECTE O SPOTIFY PARA USAR ESTE CONTROLE.");return false;}
@@ -454,8 +458,30 @@ async function togglePower(){
   if(token){const state=await getState();if(state?.item)setDisp(state.item.name,state.item.artists.map(a=>a.name).join(" / "),state.progress_ms,state.item.duration_ms);}
 }
 async function togglePlay(){if(poweredOff){await togglePower();return;}if(!requireConnection())return;if(player){player.togglePlay();return;}const s=await getState();await api(`/me/player/${s?.is_playing?"pause":"play"}`,{method:"PUT"});}
-async function prevTrack(){if(poweredOff||!requireConnection())return;if(player){player.previousTrack();return;}await api("/me/player/previous",{method:"POST"});}
-async function nextTrack(){if(poweredOff||!requireConnection())return;if(player){player.nextTrack();return;}await api("/me/player/next",{method:"POST"});}
+async function prevTrack(){
+  if(poweredOff||!requireConnection())return;
+  if(player){
+    try{await player.previousTrack();await player.resume();return;}catch{}
+  }
+  const result=await api("/me/player/previous",{method:"POST"});
+  if(result?.ok)await api("/me/player/play",{method:"PUT"});
+}
+async function nextTrack(){
+  if(poweredOff||!requireConnection())return;
+  /* Saved tracks are sent to Spotify one URI at a time, so the SDK does not
+     have a native queue for them. Advance through the list explicitly. */
+  if(plId===null&&tracks.length&&activeTrackIndex>=0){
+    let next=shuffle?Math.floor(Math.random()*tracks.length):(activeTrackIndex+1)%tracks.length;
+    if(tracks.length>1&&next===activeTrackIndex)next=(next+1)%tracks.length;
+    await playTrack(tracks[next].uri,next);
+    return;
+  }
+  if(player){
+    try{await player.nextTrack();await player.resume();return;}catch{}
+  }
+  const result=await api("/me/player/next",{method:"POST"});
+  if(result?.ok)await api("/me/player/play",{method:"PUT"});
+}
 function showVolumeUi(){const lcd=document.querySelector(".lcd");lcd.classList.add("volume-active");clearTimeout(volumeUiTimer);volumeUiTimer=setTimeout(()=>lcd.classList.remove("volume-active"),1800);}
 function onVol(v){if(poweredOff)return;v=Math.round(Number(v));rotateKnob(v);document.getElementById("volFill").style.width=v+"%";document.getElementById("volNum").textContent=v;showVolumeUi();if(player){player.setVolume(v/100);return;}if(requireConnection())api(`/me/player/volume?volume_percent=${v}`,{method:"PUT"});}
 async function toggleShuffle(){if(poweredOff||!requireConnection())return;const previous=shuffle;shuffle=!shuffle;updIco();const r=await api(`/me/player/shuffle?state=${shuffle}`,{method:"PUT"});if(!r?.ok){shuffle=previous;updIco();showShareStatus("NAO FOI POSSIVEL ALTERAR ALEATORIO");}}
@@ -589,6 +615,7 @@ async function playTrack(uri,idx){
   }
 }
 function lcdText(value){return String(value??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
+function showTrackScreen(){if(screenMode==="track")return;screenMode="track";renderScreenMode();}
 function setDisp(title,artist,p,d){lastDisplay={title,artist,position:p,duration:d};if("mediaSession" in navigator&&window.MediaMetadata&&title!=="- - - - - - - -")navigator.mediaSession.metadata=new MediaMetadata({title,artist,album:"RadioCar"});if(screenMode!=="track")return;const el=document.getElementById("lcdTitle"),artistLine=document.getElementById("lcdArtist"),isTrack=title!=="- - - - - - - -",lcdTitle=lcdText(title),lcdArtist=lcdText(artist),info=isTrack?`${lcdTitle}\u00a0\u00a0\u00a0—\u00a0\u00a0\u00a0${lcdArtist}`:lcdTitle;if(isTrack)setLcdMarquee(info);else{el.textContent=info;el.className="title";}artistLine.textContent=isTrack?"":lcdArtist.toUpperCase();dur=Math.max(0,Number(d)||0);pos=Math.max(0,Math.min(Number(p)||0,dur||0));document.getElementById("tCur").textContent=ms2t(pos);document.getElementById("tTot").textContent=ms2t(dur);updProg();}
 function updProg(){const fill=document.getElementById("progFill");if(!dur){fill.style.width="0%";return;}fill.style.width=`${Math.max(0,Math.min(100,pos/dur*100))}%`;}
 function setStatus(on,txt){document.getElementById("led").className="led"+(on?"":" off");document.querySelector(".lcd")?.classList.toggle("is-playing",Boolean(on));if("mediaSession" in navigator)navigator.mediaSession.playbackState=on?"playing":"paused";if(screenMode==="track")document.getElementById("lcdLbl").textContent=txt;isPlaying=on;}
@@ -601,7 +628,7 @@ function checkTrackCompletion(paused,current,duration){
 }
 async function getState(){if(!token)return null;const r=await api("/me/player");if(!r||r.status===204||!r.ok)return null;return r.json();}
 let pollBusy=false;
-function startPoll(){clearInterval(poll);poll=setInterval(async()=>{if(pollBusy)return;pollBusy=true;try{if(player){const s=await player.getCurrentState().catch(()=>null);if(s){const t=s.track_window.current_track;dur=s.duration;pos=s.position;isPlaying=!s.paused;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(!s.paused,s.paused?"PAUSE":"PLAYING");hiTrack(t.uri);updIco();checkTrackCompletion(s.paused,s.position,s.duration);return;}if(isPlaying){pos=Math.min(dur,pos+850);updProg();document.getElementById("tCur").textContent=ms2t(pos);if(plId===null&&dur&&pos>=dur)checkTrackCompletion(true,dur,dur);}}else{const s=await getState();if(!s||!s.item)return;dur=s.item.duration_ms;pos=s.progress_ms;setDisp(s.item.name,s.item.artists.map(a=>a.name).join(" / "),s.progress_ms,s.item.duration_ms);setStatus(s.is_playing,s.is_playing?"PLAYING":"PAUSE");hiTrack(s.item.uri);shuffle=s.shuffle_state;if(typeof s.repeat_state==="string")repeat=s.repeat_state==="track";updIco();checkTrackCompletion(!s.is_playing,s.progress_ms,s.item.duration_ms);}}finally{pollBusy=false;}},850);}
+function startPoll(){clearInterval(poll);poll=setInterval(async()=>{if(pollBusy)return;pollBusy=true;try{if(player){const s=await player.getCurrentState().catch(()=>null);if(s){const t=s.track_window.current_track;dur=s.duration;pos=s.position;isPlaying=!s.paused;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;if(isPlaying)showTrackScreen();setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(!s.paused,s.paused?"PAUSE":"PLAYING");hiTrack(t.uri);updIco();checkTrackCompletion(s.paused,s.position,s.duration);return;}if(isPlaying){pos=Math.min(dur,pos+850);updProg();document.getElementById("tCur").textContent=ms2t(pos);if(plId===null&&dur&&pos>=dur)checkTrackCompletion(true,dur,dur);}}else{const s=await getState();if(!s||!s.item)return;dur=s.item.duration_ms;pos=s.progress_ms;if(s.is_playing)showTrackScreen();setDisp(s.item.name,s.item.artists.map(a=>a.name).join(" / "),s.progress_ms,s.item.duration_ms);setStatus(s.is_playing,s.is_playing?"PLAYING":"PAUSE");hiTrack(s.item.uri);shuffle=s.shuffle_state;if(typeof s.repeat_state==="string")repeat=s.repeat_state==="track";updIco();checkTrackCompletion(!s.is_playing,s.progress_ms,s.item.duration_ms);}}finally{pollBusy=false;}},850);}
 function ms2t(ms){if(!ms)return"0:00";const s=Math.floor(ms/1000);return`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
 document.getElementById("knobOvr").addEventListener("wheel",e=>{e.preventDefault();const inp=document.getElementById("volRange");inp.value=Math.max(0,Math.min(100,+inp.value-Math.sign(e.deltaY)*2));onVol(inp.value);},{passive:false});
 const knob=document.getElementById("knobOvr"),volumeInput=document.getElementById("volRange");

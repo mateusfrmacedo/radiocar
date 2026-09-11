@@ -584,7 +584,7 @@ body.light .scale-controls output { color:#444; }
 /* A continuous two-part marquee keeps title and artist apart, while the LCD's
    lower lane reserves room for both time values and the progress bar. */
 .lcd .r2 { overflow:visible; align-items:center; padding:0 .1cqw .15cqw; }
-.lcd .title { top:0; padding:.14cqw 0 .26cqw; white-space:pre; will-change:transform; }
+.lcd .title { top:.65cqw; padding:.14cqw 0 .26cqw; white-space:pre; will-change:transform; }
 .lcd .title.scroll { animation:lcd-marquee 34s linear infinite; }
 .lcd .title.lcd-system-title { top:.65cqw; }
 .lcd .title.scroll.lcd-system-title { animation-duration:26s; }
