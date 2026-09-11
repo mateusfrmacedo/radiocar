@@ -429,7 +429,7 @@ window.onSpotifyWebPlaybackSDKReady=()=>{
   player.addListener("account_error",()=>showAuthError("A reprodução no navegador exige Spotify Premium."));
   player.addListener("initialization_error",({message})=>showAuthError(`Não foi possível iniciar o player: ${message}`));
   player.addListener("playback_error",({message})=>showAuthError(`O Spotify não conseguiu tocar esta faixa: ${message}`));
-  player.addListener("player_state_changed",s=>{if(!s)return;const t=s.track_window.current_track;isPlaying=!s.paused;dur=s.duration;pos=s.position;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;if(isPlaying)showTrackScreen();setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(isPlaying,isPlaying?"PLAYING":"PAUSE");updIco();hiTrack(t.uri);checkTrackCompletion(s.paused,s.position,s.duration);});
+  player.addListener("player_state_changed",s=>{if(!s)return;const t=s.track_window.current_track;isPlaying=!s.paused;dur=s.duration;pos=s.position;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(isPlaying,isPlaying?"PLAYING":"PAUSE");updIco();hiTrack(t.uri);checkTrackCompletion(s.paused,s.position,s.duration);});
   player.connect();
 };
 function requireConnection(){if(token)return true;showAuthError("CONECTE O SPOTIFY PARA USAR ESTE CONTROLE.");return false;}
@@ -454,9 +454,10 @@ async function togglePower(){
   setStatus(false,token?"CONECTADO":"OFFLINE");
   if(token){const state=await getState();if(state?.item)setDisp(state.item.name,state.item.artists.map(a=>a.name).join(" / "),state.progress_ms,state.item.duration_ms);}
 }
-async function togglePlay(){if(poweredOff){await togglePower();return;}if(!requireConnection())return;if(player){player.togglePlay();return;}const s=await getState();await api(`/me/player/${s?.is_playing?"pause":"play"}`,{method:"PUT"});}
+async function togglePlay(){if(poweredOff){await togglePower();showTrackScreen();return;}if(!requireConnection())return;showTrackScreen();if(player){player.togglePlay();return;}const s=await getState();await api(`/me/player/${s?.is_playing?"pause":"play"}`,{method:"PUT"});}
 async function prevTrack(){
   if(poweredOff||!requireConnection())return;
+  showTrackScreen();
   if(player){
     try{await player.previousTrack();await player.resume();return;}catch{}
   }
@@ -465,6 +466,7 @@ async function prevTrack(){
 }
 async function nextTrack(){
   if(poweredOff||!requireConnection())return;
+  showTrackScreen();
   /* When the collection context is available, Spotify owns the queue. This
      keeps next/automatic advance working even while this tab is in background. */
   if(plId===null&&playbackContext!=="saved-collection"&&tracks.length&&activeTrackIndex>=0){
@@ -600,6 +602,7 @@ async function activateRadioCar(){
 }
 async function playTrack(uri,idx){
   if(!token)return;
+  showTrackScreen();
   if(player&&!(await activateRadioCar()))return;
   activeTrackIndex=idx;
   const dev=deviceId?`?device_id=${deviceId}`:"";
@@ -646,7 +649,7 @@ function checkTrackCompletion(paused,current,duration){
 }
 async function getState(){if(!token)return null;const r=await api("/me/player");if(!r||r.status===204||!r.ok)return null;return r.json();}
 let pollBusy=false;
-function startPoll(){clearInterval(poll);poll=setInterval(async()=>{if(pollBusy)return;pollBusy=true;try{if(player){const s=await player.getCurrentState().catch(()=>null);if(s){const t=s.track_window.current_track;dur=s.duration;pos=s.position;isPlaying=!s.paused;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;if(isPlaying)showTrackScreen();setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(!s.paused,s.paused?"PAUSE":"PLAYING");hiTrack(t.uri);updIco();checkTrackCompletion(s.paused,s.position,s.duration);return;}if(isPlaying){pos=Math.min(dur,pos+850);updProg();document.getElementById("tCur").textContent=ms2t(pos);if(plId===null&&dur&&pos>=dur)checkTrackCompletion(true,dur,dur);}}else{const s=await getState();if(!s||!s.item)return;dur=s.item.duration_ms;pos=s.progress_ms;if(s.is_playing)showTrackScreen();setDisp(s.item.name,s.item.artists.map(a=>a.name).join(" / "),s.progress_ms,s.item.duration_ms);setStatus(s.is_playing,s.is_playing?"PLAYING":"PAUSE");hiTrack(s.item.uri);shuffle=s.shuffle_state;if(typeof s.repeat_state==="string")repeat=s.repeat_state==="track";updIco();checkTrackCompletion(!s.is_playing,s.progress_ms,s.item.duration_ms);}}finally{pollBusy=false;}},850);}
+function startPoll(){clearInterval(poll);poll=setInterval(async()=>{if(pollBusy)return;pollBusy=true;try{if(player){const s=await player.getCurrentState().catch(()=>null);if(s){const t=s.track_window.current_track;dur=s.duration;pos=s.position;isPlaying=!s.paused;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(!s.paused,s.paused?"PAUSE":"PLAYING");hiTrack(t.uri);updIco();checkTrackCompletion(s.paused,s.position,s.duration);return;}if(isPlaying){pos=Math.min(dur,pos+850);updProg();document.getElementById("tCur").textContent=ms2t(pos);if(plId===null&&dur&&pos>=dur)checkTrackCompletion(true,dur,dur);}}else{const s=await getState();if(!s||!s.item)return;dur=s.item.duration_ms;pos=s.progress_ms;setDisp(s.item.name,s.item.artists.map(a=>a.name).join(" / "),s.progress_ms,s.item.duration_ms);setStatus(s.is_playing,s.is_playing?"PLAYING":"PAUSE");hiTrack(s.item.uri);shuffle=s.shuffle_state;if(typeof s.repeat_state==="string")repeat=s.repeat_state==="track";updIco();checkTrackCompletion(!s.is_playing,s.progress_ms,s.item.duration_ms);}}finally{pollBusy=false;}},850);}
 function ms2t(ms){if(!ms)return"0:00";const s=Math.floor(ms/1000);return`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
 document.getElementById("knobOvr").addEventListener("wheel",e=>{e.preventDefault();const inp=document.getElementById("volRange");inp.value=Math.max(0,Math.min(100,+inp.value-Math.sign(e.deltaY)*2));onVol(inp.value);},{passive:false});
 const knob=document.getElementById("knobOvr"),volumeInput=document.getElementById("volRange");
