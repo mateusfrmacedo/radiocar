@@ -579,6 +579,27 @@ body.light .scale-controls output { color:#444; }
 /* Center mode icons on the exact status lane used by PLAYING. */
 .lcd .icons { top:0; height:15%; align-items:center; }
 
+/* A continuous two-part marquee keeps title and artist apart, while the LCD's
+   lower lane reserves room for both time values and the progress bar. */
+.lcd .r2 { overflow:visible; align-items:center; padding:0 .1cqw .15cqw; }
+.lcd .title { top:0; padding:.14cqw 0 .26cqw; white-space:pre; will-change:transform; }
+.lcd .title.scroll { animation:lcd-marquee 34s linear infinite; }
+.lcd .title.lcd-system-title { top:.65cqw; }
+.lcd .title.scroll.lcd-system-title { animation-duration:26s; }
+.lcd .clock-colon { animation:clock-blink 1s steps(1,end) infinite; }
+@keyframes clock-blink { 0%,48% { opacity:1; } 49%,100% { opacity:.18; } }
+@keyframes lcd-marquee { 0%,10% { transform:translateX(0); } 90%,100% { transform:translateX(-50%); } }
+.lcd .r4 { left:.55cqw; right:.55cqw; bottom:.32cqw; height:1.2cqw; }
+.lcd .time-row { display:grid; grid-template-columns:3.7cqw minmax(0,1fr) 3.7cqw; gap:.5cqw; padding:0; height:100%; align-items:center; }
+.lcd .time-row .prog-track { width:100%; min-width:0; }
+.lcd #tTot { position:static; min-width:0; transform:none; text-align:right; }
+
+/* PiP refresh is configurable without rebuilding the radio face every tick. */
+.settings-pip-rate { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:8px; color:#aaa; font:9px "Share Tech Mono",monospace; letter-spacing:.7px; }
+.settings-pip-rate select { width:66px; border:1px solid #515151; border-radius:4px; background:#202020; color:#e2e2e2; padding:4px 3px; font:9px "Share Tech Mono",monospace; cursor:pointer; }
+body.light .settings-pip-rate { color:#555; }
+body.light .settings-pip-rate select { background:#eee; border-color:#aaa; color:#333; }
+
 /* Side-by-side Spotify library: playlists select the tracks on the right. */
 .library-layout { display:grid; grid-template-columns:minmax(190px,.78fr) minmax(0,1.22fr); gap:16px; align-items:start; }
 .playlist-column,.tracks-column { min-width:0; }
