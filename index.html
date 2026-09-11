@@ -76,6 +76,7 @@
       <div class="lcd-spectrum" aria-hidden="true">
         <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
       </div>
+      <div class="lcd-power-fx" aria-hidden="true"></div>
       <div class="lcd-inner">
         <div class="r1">
           <div class="r1-left">
@@ -378,7 +379,7 @@ function doFlash(btn){
 const SPOTIFY_CLIENT_ID="bb679e6ebdea4e0a864c689e7ce93737";
 const REDIRECT=location.hostname.endsWith(".github.io")?location.origin+location.pathname.replace(/\/$/,""):location.href.split("?")[0].split("#")[0];
 const SCOPES="streaming user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private user-library-read";
-let token=null,player=null,deviceId=null,dur=0,pos=0,isPlaying=false,shuffle=false,repeat=false,plId=null,tracks=[],poll=null,playerBooted=false,poweredOff=false,volumeUiTimer=null;
+let token=null,player=null,deviceId=null,dur=0,pos=0,isPlaying=false,shuffle=false,repeat=false,plId=null,tracks=[],poll=null,playerBooted=false,poweredOff=false,volumeUiTimer=null,powerFxTimer=null;
 let activeTrackIndex=-1,autoAdvancePending=false;
 let screenMode="track",screenClockTimer=null,lastDisplay={title:"- - - - - - - -",artist:"AGUARDANDO SINAL",position:0,duration:0};
 
@@ -431,7 +432,27 @@ window.onSpotifyWebPlaybackSDKReady=()=>{
   player.connect();
 };
 function requireConnection(){if(token)return true;showAuthError("CONECTE O SPOTIFY PARA USAR ESTE CONTROLE.");return false;}
-async function togglePower(){poweredOff=!poweredOff;const radio=document.getElementById("rw");radio.classList.toggle("is-powered-off",poweredOff);if(poweredOff){if(player)await player.pause();else if(token)await api("/me/player/pause",{method:"PUT"});setStatus(false,"DESLIGADO");return;}setStatus(false,token?"CONECTADO":"OFFLINE");if(token){const state=await getState();if(state?.item)setDisp(state.item.name,state.item.artists.map(a=>a.name).join(" / "),state.progress_ms,state.item.duration_ms);}}
+async function togglePower(){
+  poweredOff=!poweredOff;
+  const radio=document.getElementById("rw");
+  clearTimeout(powerFxTimer);
+  if(poweredOff){
+    radio.classList.remove("powering-on");
+    radio.classList.add("powering-off");
+    powerFxTimer=setTimeout(()=>{
+      radio.classList.add("is-powered-off");
+      powerFxTimer=setTimeout(()=>{radio.classList.remove("powering-off");powerFxTimer=null;},110);
+    },310);
+    if(player)await player.pause();else if(token)await api("/me/player/pause",{method:"PUT"});
+    setStatus(false,"DESLIGADO");
+    return;
+  }
+  radio.classList.remove("is-powered-off","powering-off");
+  radio.classList.add("powering-on");
+  powerFxTimer=setTimeout(()=>{radio.classList.remove("powering-on");powerFxTimer=null;},520);
+  setStatus(false,token?"CONECTADO":"OFFLINE");
+  if(token){const state=await getState();if(state?.item)setDisp(state.item.name,state.item.artists.map(a=>a.name).join(" / "),state.progress_ms,state.item.duration_ms);}
+}
 async function togglePlay(){if(poweredOff){await togglePower();return;}if(!requireConnection())return;if(player){player.togglePlay();return;}const s=await getState();await api(`/me/player/${s?.is_playing?"pause":"play"}`,{method:"PUT"});}
 async function prevTrack(){if(poweredOff||!requireConnection())return;if(player){player.previousTrack();return;}await api("/me/player/previous",{method:"POST"});}
 async function nextTrack(){if(poweredOff||!requireConnection())return;if(player){player.nextTrack();return;}await api("/me/player/next",{method:"POST"});}
@@ -474,17 +495,21 @@ function showMenu(){if(poweredOff)return;screenMode=screenMode==="menu"?"track":
 function showUsbInfo(){const el=document.getElementById("lcdArtist"),o=el.textContent;el.textContent="USB: USE O SPOTIFY";setTimeout(()=>el.textContent=o,2200);}
 function showShareStatus(text){const el=document.getElementById("lcdLbl"),previous=el.textContent;el.textContent=text;clearTimeout(showShareStatus.timer);showShareStatus.timer=setTimeout(()=>{if(screenMode==="track")el.textContent=previous;},2400);}
 async function shareTrack(){
-  const siteUrl="https://mateusfrmacedo.github.io/radiocar/";
-  const track=lastDisplay.title!=="- - - - - - - -"?`${lastDisplay.title} — ${lastDisplay.artist}`:"RadioCar";
+  const siteUrl="https://mateusfrmacedo.github.io/radiocar";
   try{
-    if(navigator.share){
-      await navigator.share({title:"RadioCar",text:track,url:siteUrl});
-      showShareStatus("COMPARTILHADO");
-      return;
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(siteUrl);
+    }else{
+      const field=document.createElement("textarea");
+      field.value=siteUrl;field.setAttribute("readonly","");
+      field.style.cssText="position:fixed;opacity:0;pointer-events:none";
+      document.body.append(field);field.select();
+      const copied=document.execCommand("copy");
+      field.remove();
+      if(!copied)throw new Error("clipboard unavailable");
     }
-    if(navigator.clipboard)await navigator.clipboard.writeText(siteUrl).catch(()=>{});
     showShareStatus("LINK COPIADO");
-  }catch(error){showShareStatus("ERRO AO COMPARTILHAR");}
+  }catch(error){showShareStatus("NAO FOI POSSIVEL COPIAR");}
 }
 async function loadPlaylists(){if(!token)return;const r=await api("/me/playlists?limit=50");const row=document.getElementById("chips");if(!r||!r.ok){row.innerHTML='<div class="system-msg">NÃO FOI POSSÍVEL LER AS PLAYLISTS</div>';return;}const d=await r.json();row.innerHTML="";const liked=document.createElement("button");liked.className="chip liked-chip";liked.textContent="Músicas curtidas";liked.type="button";liked.onclick=()=>loadSavedTracks(liked);row.appendChild(liked);(d.items||[]).forEach(pl=>{const c=document.createElement("button");c.className="chip";c.textContent=pl.name;c.type="button";c.onclick=()=>loadTracks(pl.id,pl.name,c);row.appendChild(c);});if(!d.items?.length)row.insertAdjacentHTML("beforeend",'<div class="system-msg">NENHUMA OUTRA PLAYLIST DISPONÍVEL</div>');}
 let libraryLoadId=0;
@@ -578,11 +603,11 @@ async function getState(){if(!token)return null;const r=await api("/me/player");
 let pollBusy=false;
 function startPoll(){clearInterval(poll);poll=setInterval(async()=>{if(pollBusy)return;pollBusy=true;try{if(player){const s=await player.getCurrentState().catch(()=>null);if(s){const t=s.track_window.current_track;dur=s.duration;pos=s.position;isPlaying=!s.paused;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(!s.paused,s.paused?"PAUSE":"PLAYING");hiTrack(t.uri);updIco();checkTrackCompletion(s.paused,s.position,s.duration);return;}if(isPlaying){pos=Math.min(dur,pos+850);updProg();document.getElementById("tCur").textContent=ms2t(pos);if(plId===null&&dur&&pos>=dur)checkTrackCompletion(true,dur,dur);}}else{const s=await getState();if(!s||!s.item)return;dur=s.item.duration_ms;pos=s.progress_ms;setDisp(s.item.name,s.item.artists.map(a=>a.name).join(" / "),s.progress_ms,s.item.duration_ms);setStatus(s.is_playing,s.is_playing?"PLAYING":"PAUSE");hiTrack(s.item.uri);shuffle=s.shuffle_state;if(typeof s.repeat_state==="string")repeat=s.repeat_state==="track";updIco();checkTrackCompletion(!s.is_playing,s.progress_ms,s.item.duration_ms);}}finally{pollBusy=false;}},850);}
 function ms2t(ms){if(!ms)return"0:00";const s=Math.floor(ms/1000);return`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
-document.getElementById("knobOvr").addEventListener("wheel",e=>{e.preventDefault();const inp=document.getElementById("volRange");inp.value=Math.max(0,Math.min(100,+inp.value-Math.sign(e.deltaY)*6));onVol(inp.value);},{passive:false});
+document.getElementById("knobOvr").addEventListener("wheel",e=>{e.preventDefault();const inp=document.getElementById("volRange");inp.value=Math.max(0,Math.min(100,+inp.value-Math.sign(e.deltaY)*2));onVol(inp.value);},{passive:false});
 const knob=document.getElementById("knobOvr"),volumeInput=document.getElementById("volRange");
 let knobDrag=null;
 knob.addEventListener("pointerdown",event=>{if(poweredOff)return;knobDrag={id:event.pointerId,y:event.clientY,value:+volumeInput.value};knob.setPointerCapture(event.pointerId);});
-knob.addEventListener("pointermove",event=>{if(!knobDrag||event.pointerId!==knobDrag.id)return;const value=Math.max(0,Math.min(100,knobDrag.value-(event.clientY-knobDrag.y)*1.1));volumeInput.value=value;onVol(value);});
+knob.addEventListener("pointermove",event=>{if(!knobDrag||event.pointerId!==knobDrag.id)return;const value=Math.max(0,Math.min(100,knobDrag.value-(event.clientY-knobDrag.y)*.4));volumeInput.value=value;onVol(value);});
 ["pointerup","pointercancel"].forEach(type=>knob.addEventListener(type,event=>{if(knobDrag?.id===event.pointerId)knobDrag=null;}));
 document.querySelectorAll(".ovr").forEach(control=>{
   control.addEventListener("pointerdown",()=>{if(!control.classList.contains("o-brand"))stopScreenAnimation();control.classList.add("is-pressed");if(navigator.vibrate)navigator.vibrate(8);});
