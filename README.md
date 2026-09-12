@@ -1,5 +1,7 @@
 # RadioCar
 
+<img width="730" height="372" alt="Captura de Tela 2026-09-11 às 14 08 03" src="https://github.com/user-attachments/assets/eb9605cc-48db-4b26-843e-30a875adf5af" />
+
 A browser-based Spotify player inspired by classic car stereos, with a digital display, physical-style controls, and customizable lighting.
 
 [Open RadioCar](https://mateusfrmacedo.github.io/radiocar/)
