@@ -17,7 +17,6 @@ A browser-based Spotify player inspired by classic car stereos, with a digital d
 - Switch between screen animations and an animated equalizer.
 - Enable **MIC EQ** to make the equalizer react to sound captured by your microphone.
 - Open a compact **Picture-in-Picture** player in supported browsers.
-- Share the RadioCar website with the share button.
 
 ## Getting started
 
