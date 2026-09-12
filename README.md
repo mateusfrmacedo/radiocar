@@ -17,7 +17,7 @@ Após a publicação no GitHub Pages, o endereço do projeto é:
 - Controle de volume pelo grande botão rotativo, inclusive com arrastar vertical em telas sensíveis ao toque.
 - Botões físicos para ligar/desligar, tocar/pausar, faixa anterior, próxima, aleatório, repetição, informações e compartilhamento.
 - Autenticação individual com Spotify: cada visitante conecta a própria conta; nenhuma senha é armazenada pelo RadioCar.
-- Leitura das playlists da conta conectada e seleção de faixas no próprio painel.
+- Leitura de todas as páginas de playlists da conta conectada, incluindo colaborativas autorizadas, e seleção de faixas no próprio painel.
 - Reprodução via Spotify Web Playback SDK, com atualização de título, artista, progresso e volume no LCD.
 - Modo minimalista: o botão físico do Spotify oculta ou reabre a biblioteca de playlists e faixas.
 - Alternância entre acabamento escuro e claro.
@@ -28,7 +28,7 @@ Após a publicação no GitHub Pages, o endereço do projeto é:
 | --- | --- |
 | Power | Liga ou desliga o rádio e as luzes vermelhas do painel. |
 | Botão rotativo | Ajusta o volume. Arraste para cima ou para baixo. |
-| Play/Pause | Inicia ou pausa a faixa atual. |
+| Play/Pause | Retoma a sessão do Spotify no RadioCar ou pausa a faixa atual. Sem sessão disponível, toca a última música do histórico desde o início. |
 | Botão Spotify | Antes da conexão, abre o login do Spotify. Depois, mostra ou oculta playlists e faixas. |
 | Menu | Mostra a biblioteca de playlists. |
 | Voltar / anterior | Retorna à faixa anterior. |
@@ -43,6 +43,8 @@ Após a publicação no GitHub Pages, o endereço do projeto é:
 ## Requisitos do Spotify
 
 O controle completo de reprodução no navegador usa o Spotify Web Playback SDK. Por isso, a conta conectada precisa ter **Spotify Premium**. Contas gratuitas podem concluir o login, mas a reprodução dentro do player pode não ser disponibilizada pela plataforma.
+
+Após atualizar de uma versão anterior, use **Reconectar Spotify · liberar colaborativas e histórico** na biblioteca para conceder as novas permissões. A retomada preserva a posição e a fila quando o Spotify ainda disponibiliza a sessão; o histórico fornece a faixa, mas não a posição em que ela parou.
 
 O projeto utiliza OAuth com PKCE. O identificador público do aplicativo Spotify fica no código, mas o `client secret` nunca deve ser colocado em arquivos publicados ou no navegador.
 
@@ -82,3 +84,7 @@ O site é estático e pode ser servido diretamente pelo GitHub Pages a partir da
 ## Privacidade
 
 Os tokens de acesso necessários para a sessão do Spotify ficam somente no armazenamento local do navegador do visitante. O RadioCar não possui servidor próprio nem armazena dados de contas musicais.
+
+## Verificação da integração
+
+Execute `node --test tests/spotify.test.cjs` para validar paginação, respostas fora de ordem, seleção de faixas e retomada com respostas simuladas do Spotify. A reprodução de áudio real requer uma sessão Spotify Premium no navegador.

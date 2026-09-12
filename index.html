@@ -131,6 +131,7 @@
     <button class="ovr o-brand" onclick="doFlash(this);toggleScreenAnimation()"></button>
   </div>
 
+  <div class="auth-err" id="authErr" role="status" aria-live="polite" hidden></div>
   <div class="pl-panel auth-mode" id="plPanel">
     <div id="authBlock">
       <div class="auth-block">
@@ -141,7 +142,6 @@
           Conectar com Spotify
         </button>
       </div>
-      <div class="auth-err" id="authErr"></div>
     </div>
 
     <div class="panel-toolbar" id="panelToolbar" style="display:none">
@@ -380,16 +380,19 @@ function doFlash(btn){
 
 const SPOTIFY_CLIENT_ID="bb679e6ebdea4e0a864c689e7ce93737";
 const REDIRECT=location.hostname.endsWith(".github.io")?location.origin+location.pathname.replace(/\/$/,""):location.href.split("?")[0].split("#")[0];
-const SCOPES="streaming user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private user-library-read";
+const SCOPES="streaming user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative user-library-read user-read-recently-played";
 let token=null,player=null,deviceId=null,dur=0,pos=0,isPlaying=false,shuffle=false,repeat=false,plId=null,tracks=[],poll=null,playerBooted=false,poweredOff=false,volumeUiTimer=null,powerFxTimer=null;
 let activeTrackIndex=-1,autoAdvancePending=false,playbackContext="none";
+let playbackBusy=false,playbackRevision=0,stateRevision=0,pendingPlayback=null,currentTrackUri=null;
+let playlistsLoadId=0,lastRemotePoll=0;
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let screenMode="track",screenClockTimer=null,lastDisplay={title:"- - - - - - - -",artist:"AGUARDANDO SINAL",position:0,duration:0};
 
 /* Gives the browser an active media session, so playback remains a proper
    background media task when the user moves to another tab or application. */
 function setupMediaSession(){
   if(!("mediaSession" in navigator))return;
-  const handlers={play:togglePlay,pause:togglePlay,previoustrack:prevTrack,nexttrack:nextTrack};
+  const handlers={play:()=>togglePlay(true),pause:()=>togglePlay(false),previoustrack:prevTrack,nexttrack:nextTrack};
   Object.entries(handlers).forEach(([action,handler])=>{try{navigator.mediaSession.setActionHandler(action,handler);}catch{}});
 }
 setupMediaSession();
@@ -400,13 +403,13 @@ if(params.get("code")) exchangeCode(params.get("code"));
 else if(params.get("error")) showAuthError("Conexão cancelada no Spotify.");
 else if(savedToken){token=savedToken;verify();}
 
-function showAuthError(message){const e=document.getElementById("authErr");if(e)e.textContent=message;}
+function showAuthError(message){const e=document.getElementById("authErr");if(e){e.textContent=message;e.hidden=!message;}if(message)showShareStatus(message);}
 function randomString(length=64){const chars="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";const values=crypto.getRandomValues(new Uint8Array(length));return [...values].map(v=>chars[v%chars.length]).join("");}
 async function challengeFor(verifier){const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier));return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");}
 async function exchangeCode(code){
   const verifier=localStorage.getItem("rc_verifier"),cid=localStorage.getItem("rc_cid");
   if(!verifier||!cid){showAuthError("Sessão de conexão expirou. Tente novamente.");return;}
-  try{const r=await fetch("https://accounts.spotify.com/api/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:cid,grant_type:"authorization_code",code,redirect_uri:REDIRECT,code_verifier:verifier})});const d=await r.json();if(!r.ok)throw new Error(d.error_description||"Não foi possível concluir a conexão.");token=d.access_token;localStorage.setItem("rc_tok",token);if(d.refresh_token)localStorage.setItem("rc_refresh",d.refresh_token);history.replaceState({},document.title,REDIRECT);bootSDK();showMain();}catch(err){showAuthError(err.message);}
+  try{const r=await fetch("https://accounts.spotify.com/api/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:cid,grant_type:"authorization_code",code,redirect_uri:REDIRECT,code_verifier:verifier})});const d=await r.json();if(!r.ok)throw new Error(d.error_description||"Não foi possível concluir a conexão.");token=d.access_token;localStorage.setItem("rc_tok",token);localStorage.setItem("rc_scopes",d.scope||"");if(d.refresh_token)localStorage.setItem("rc_refresh",d.refresh_token);history.replaceState({},document.title,REDIRECT);bootSDK();showMain();}catch(err){showAuthError(err.message);}
 }
 async function refreshToken(){const refresh=localStorage.getItem("rc_refresh"),cid=localStorage.getItem("rc_cid")||SPOTIFY_CLIENT_ID;if(!refresh)return false;try{const r=await fetch("https://accounts.spotify.com/api/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:cid,grant_type:"refresh_token",refresh_token:refresh})});const d=await r.json();if(!r.ok)throw new Error();token=d.access_token;localStorage.setItem("rc_tok",token);if(d.refresh_token)localStorage.setItem("rc_refresh",d.refresh_token);return true;}catch{return false;}}
 async function verify(){const r=await api("/me");if(r&&r.ok){bootSDK();showMain();}else if(await refreshToken()){bootSDK();showMain();}else disconnect();}
@@ -419,7 +422,7 @@ async function connectSpotify(){
 }
 function pulseBluetooth(){const bt=document.getElementById("iBT");bt.classList.add("on","pairing");clearTimeout(pulseBluetooth.timer);pulseBluetooth.timer=setTimeout(()=>bt.classList.remove("pairing"),5000);}
 function toggleLibrary(force){const main=document.getElementById("mainBlock"),button=document.getElementById("panelToggle"),panel=document.getElementById("plPanel");const hide=typeof force==="boolean"?force:main.style.display!=="none";main.style.display=hide?"none":"block";panel.classList.toggle("is-collapsed",hide);button.textContent=hide?"MOSTRAR LISTAS":"OCULTAR LISTAS";button.setAttribute("aria-expanded",String(!hide));}
-function disconnect(){token=null;localStorage.removeItem("rc_tok");localStorage.removeItem("rc_refresh");if(player){player.disconnect();player=null;}playerBooted=false;clearInterval(poll);setDisp("- - - - - - - -","PRESSIONE SPOTIFY",0,0);setStatus(false,"OFFLINE");document.getElementById("authBlock").style.display="block";document.getElementById("mainBlock").style.display="none";document.getElementById("panelToolbar").style.display="none";document.getElementById("plPanel").classList.add("auth-mode");}
+function disconnect(){token=null;deviceId=null;pendingPlayback=null;currentTrackUri=null;playbackRevision++;stateRevision++;libraryLoadId++;playlistsLoadId++;localStorage.removeItem("rc_scopes");localStorage.removeItem("rc_tok");localStorage.removeItem("rc_refresh");if(player){player.disconnect();player=null;}playerBooted=false;clearInterval(poll);setDisp("- - - - - - - -","PRESSIONE SPOTIFY",0,0);setStatus(false,"OFFLINE");document.getElementById("authBlock").style.display="block";document.getElementById("mainBlock").style.display="none";document.getElementById("panelToolbar").style.display="none";document.getElementById("plPanel").classList.add("auth-mode");}
 function showMain(){document.getElementById("authBlock").style.display="none";document.getElementById("panelToolbar").style.display="flex";document.getElementById("plPanel").classList.remove("auth-mode");document.getElementById("mainBlock").style.display="none";document.getElementById("plPanel").classList.add("is-collapsed");setStatus(false,"CONECTADO");loadPlaylists();startPoll();}
 function bootSDK(){if(!token||playerBooted)return;playerBooted=true;const s=document.createElement("script");s.src="https://sdk.scdn.co/spotify-player.js";document.body.appendChild(s);}
 window.onSpotifyWebPlaybackSDKReady=()=>{
@@ -430,11 +433,14 @@ window.onSpotifyWebPlaybackSDKReady=()=>{
   player.addListener("account_error",()=>showAuthError("A reprodução no navegador exige Spotify Premium."));
   player.addListener("initialization_error",({message})=>showAuthError(`Não foi possível iniciar o player: ${message}`));
   player.addListener("playback_error",({message})=>showAuthError(`O Spotify não conseguiu tocar esta faixa: ${message}`));
-  player.addListener("player_state_changed",s=>{if(!s)return;const t=s.track_window.current_track;isPlaying=!s.paused;dur=s.duration;pos=s.position;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(isPlaying,isPlaying?"PLAYING":"PAUSE");updIco();hiTrack(t.uri);checkTrackCompletion(s.paused,s.position,s.duration);});
+  player.addListener("player_state_changed",s=>{stateRevision++;applySDKState(s);});
+  player.addListener("autoplay_failed",()=>{pendingPlayback=null;showAuthError("O navegador bloqueou o áudio. Pressione play novamente.");});
   player.connect();
 };
 function requireConnection(){if(token)return true;showAuthError("CONECTE O SPOTIFY PARA USAR ESTE CONTROLE.");return false;}
 async function togglePower(){
+  if(playbackBusy)return;
+  pendingPlayback=null;playbackRevision++;
   poweredOff=!poweredOff;
   const radio=document.getElementById("rw");
   clearTimeout(powerFxTimer);
@@ -455,9 +461,46 @@ async function togglePower(){
   setStatus(false,token?"CONECTADO":"OFFLINE");
   if(token){const state=await getState();if(state?.item)setDisp(state.item.name,state.item.artists.map(a=>a.name).join(" / "),state.progress_ms,state.item.duration_ms);}
 }
-async function togglePlay(){if(poweredOff){await togglePower();showTrackScreen();return;}if(!requireConnection())return;showTrackScreen();if(player){player.togglePlay();return;}const s=await getState();await api(`/me/player/${s?.is_playing?"pause":"play"}`,{method:"PUT"});}
+async function togglePlay(wantPlaying){
+  if(playbackBusy||!requireConnection())return;
+  if(pendingPlayback&&Date.now()<pendingPlayback.until)return;
+  // Unlock audio during the click, before any network request loses the gesture.
+  const activation=player?.activateElement().catch(()=>{});
+  if(poweredOff)await togglePower();
+  showTrackScreen();
+  await runPlayback(async()=>{
+    await activation;
+    const local=await player?.getCurrentState().catch(()=>null);
+    const shouldPlay=typeof wantPlaying==="boolean"?wantPlaying:!(local&&!local.paused);
+    if(local){
+      pendingPlayback={uri:local.track_window.current_track.uri,playing:shouldPlay,until:Date.now()+8000};
+      if(shouldPlay)await player.resume();else await player.pause();
+      return;
+    }
+    if(!shouldPlay)return;
+    // Read the existing Spotify session before transferring it to this browser.
+    const remote=await getState(true);
+    if(!await activateRadioCar())throw new Error("O RadioCar ainda está iniciando. Pressione play novamente.");
+    playbackContext="none";
+    if(remote?.item){
+      pendingPlayback={uri:remote.item.uri,playing:true,until:Date.now()+8000};
+      const r=await api("/me/player",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({device_ids:[deviceId],play:true})});
+      await assertPlayback(r);
+      return;
+    }
+    // An expired session has no position. History supplies the most recent song.
+    const recent=await api("/me/player/recently-played?limit=1");
+    if(recent?.status===403)throw new Error("Reconecte o Spotify para autorizar o histórico e retomar a última música.");
+    if(!recent?.ok)throw new Error("Não foi possível consultar a última música. Tente novamente.");
+    const entry=(await recent.json()).items?.[0];
+    if(!entry?.track?.uri)throw new Error("Seu histórico está vazio. Escolha uma música na biblioteca.");
+    pendingPlayback={uri:entry.track.uri,playing:true,until:Date.now()+8000};
+    await assertPlayback(await startSpotifyPlayback({uris:[entry.track.uri],position_ms:0}));
+  });
+}
 async function prevTrack(){
-  if(poweredOff||!requireConnection())return;
+  if(poweredOff||playbackBusy||!requireConnection())return;
+  pendingPlayback=null;playbackRevision++;
   showTrackScreen();
   if(player){
     try{await player.previousTrack();await player.resume();return;}catch{}
@@ -466,11 +509,12 @@ async function prevTrack(){
   if(result?.ok)await api("/me/player/play",{method:"PUT"});
 }
 async function nextTrack(){
-  if(poweredOff||!requireConnection())return;
+  if(poweredOff||playbackBusy||!requireConnection())return;
+  pendingPlayback=null;playbackRevision++;
   showTrackScreen();
   /* When the collection context is available, Spotify owns the queue. This
      keeps next/automatic advance working even while this tab is in background. */
-  if(plId===null&&playbackContext!=="saved-collection"&&tracks.length&&activeTrackIndex>=0){
+  if(plId===null&&playbackContext==="saved-fallback"&&tracks.length&&activeTrackIndex>=0){
     let next=shuffle?Math.floor(Math.random()*tracks.length):(activeTrackIndex+1)%tracks.length;
     if(tracks.length>1&&next===activeTrackIndex)next=(next+1)%tracks.length;
     await playTrack(tracks[next].uri,next);
@@ -490,6 +534,9 @@ async function seekTo(e){if(poweredOff||!requireConnection()||!dur)return;const 
 function setLcdMarquee(value,isSystemMessage=false){
   const el=document.getElementById("lcdTitle");
   const text=lcdText(value).trim()||"- - - - - - - -";
+  const key=JSON.stringify([text,isSystemMessage]);
+  if(el.dataset.marqueeKey===key&&el.classList.contains("scroll"))return;
+  el.dataset.marqueeKey=key;
   const gap="\u00a0".repeat(12);
   if(!isSystemMessage){
     el.textContent=`${text}${gap}${text}${gap}`;
@@ -537,40 +584,85 @@ async function shareTrack(){
     showShareStatus("LINK COPIADO");
   }catch(error){showShareStatus("NAO FOI POSSIVEL COPIAR");}
 }
-async function loadPlaylists(){if(!token)return;const r=await api("/me/playlists?limit=50");const row=document.getElementById("chips");if(!r||!r.ok){row.innerHTML='<div class="system-msg">NÃO FOI POSSÍVEL LER AS PLAYLISTS</div>';return;}const d=await r.json();row.innerHTML="";const liked=document.createElement("button");liked.className="chip liked-chip";liked.textContent="Músicas curtidas";liked.type="button";liked.onclick=()=>loadSavedTracks(liked);row.appendChild(liked);(d.items||[]).forEach(pl=>{const c=document.createElement("button");c.className="chip";c.textContent=pl.name;c.type="button";c.onclick=()=>loadTracks(pl.id,pl.name,c);row.appendChild(c);});if(!d.items?.length)row.insertAdjacentHTML("beforeend",'<div class="system-msg">NENHUMA OUTRA PLAYLIST DISPONÍVEL</div>');}
+async function loadPlaylists(){
+  if(!token)return;
+  const loadId=++playlistsLoadId,row=document.getElementById("chips");
+  row.innerHTML="";
+  const liked=document.createElement("button");
+  liked.className="chip liked-chip";liked.textContent="Músicas curtidas";liked.type="button";
+  liked.onclick=()=>loadSavedTracks(liked);row.appendChild(liked);
+  const scopes=new Set((localStorage.getItem("rc_scopes")||"").split(" "));
+  if(!scopes.has("playlist-read-collaborative")||!scopes.has("user-read-recently-played")){
+    const reconnect=document.createElement("button");
+    reconnect.className="chip";reconnect.type="button";
+    reconnect.textContent="Reconectar Spotify · liberar colaborativas e histórico";
+    reconnect.onclick=connectSpotify;row.appendChild(reconnect);
+  }
+  const status=document.createElement("div");status.className="system-msg";status.textContent="CARREGANDO PLAYLISTS...";row.appendChild(status);
+  const seen=new Set();let offset=0;
+  while(loadId===playlistsLoadId&&token){
+    const r=await api(`/me/playlists?limit=50&offset=${offset}`);
+    if(loadId!==playlistsLoadId)return;
+    if(!r?.ok){
+      status.textContent=seen.size?"ALGUMAS PLAYLISTS NÃO CARREGARAM. ":"NÃO FOI POSSÍVEL LER AS PLAYLISTS. ";
+      const retry=document.createElement("button");retry.type="button";retry.className="chip";retry.textContent="Tentar novamente";retry.onclick=loadPlaylists;status.appendChild(retry);return;
+    }
+    const page=await r.json();if(loadId!==playlistsLoadId)return;
+    const items=page.items||[];
+    for(const pl of items){
+      if(!pl?.id||seen.has(pl.id))continue;
+      seen.add(pl.id);
+      const c=document.createElement("button");c.className="chip";c.textContent=pl.name;c.type="button";
+      c.onclick=()=>loadTracks(pl.id,pl.name,c);row.insertBefore(c,status);
+    }
+    if(!page.next||!items.length)break;
+    offset+=items.length;
+  }
+  status.textContent=seen.size?"":"NENHUMA OUTRA PLAYLIST DISPONÍVEL";
+}
+function playableTracks(items){
+  return items.map((entry,index)=>{
+    const track=entry?.item||entry?.track;
+    return track?{...track,playlistPosition:index}:null;
+  }).filter(track=>track?.type==="track"&&!track.is_local&&track.is_playable!==false&&track.uri?.startsWith("spotify:track:"));
+}
 let libraryLoadId=0;
 async function loadSavedTracks(chip){
   const loadId=++libraryLoadId;
   plId=null;
-  playbackContext="none";
+  tracks=[];
   document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
   chip.classList.add("on");
   document.getElementById("plName").textContent="Músicas curtidas";
   document.getElementById("tlist").innerHTML='<div class="system-msg">SINTONIZANDO...</div>';
   const first=await api("/me/tracks?limit=50&offset=0");
+  if(loadId!==libraryLoadId)return;
   if(!first||!first.ok){
     document.getElementById("tlist").innerHTML='<button class="system-msg reconnect-saved" type="button">RECONECTAR PARA VER CURTIDAS</button>';
     document.querySelector(".reconnect-saved").onclick=connectSpotify;
     return;
   }
   let page=await first.json(),items=page.items||[];
-  tracks=items.map(item=>item.track).filter(track=>track&&track.type==="track");
+  if(loadId!==libraryLoadId)return;
+  tracks=playableTracks(items);
   renderTracks();
   /* Show the first 50 immediately, then grow the list without blocking it. */
   let offset=items.length;
   while(page.next&&items.length&&loadId===libraryLoadId){
     const r=await api(`/me/tracks?limit=50&offset=${offset}`);
+    if(loadId!==libraryLoadId)return;
     if(!r||!r.ok)break;
     page=await r.json();items=page.items||[];
-    tracks.push(...items.map(item=>item.track).filter(track=>track&&track.type==="track"));
+    if(loadId!==libraryLoadId)return;
+    tracks.push(...playableTracks(items).map(track=>({...track,playlistPosition:track.playlistPosition+offset})));
     offset+=items.length;
     if(loadId===libraryLoadId)renderTracks();
   }
 }
 async function loadTracks(id,name,chip){
-  ++libraryLoadId;
+  const loadId=++libraryLoadId;
   plId=id;
-  playbackContext="none";
+  tracks=[];
   document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
   chip.classList.add("on");
   document.getElementById("plName").textContent=name;
@@ -579,59 +671,77 @@ async function loadTracks(id,name,chip){
   let offset=0;
   while(true){
     const r=await api(`/playlists/${id}/items?limit=50&offset=${offset}`);
+    if(loadId!==libraryLoadId)return;
     if(!r||!r.ok){document.getElementById("tlist").innerHTML='<div class="system-msg">FAIXAS INDISPONÍVEIS NESTA PLAYLIST</div>';return;}
     const page=await r.json();
+    if(loadId!==libraryLoadId)return;
     const items=page.items||[];
     allItems.push(...items);
     if(!page.next||!items.length)break;
     offset+=items.length;
   }
-  tracks=allItems.map(i=>i.item).filter(t=>t&&t.type==="track");
+  tracks=playableTracks(allItems);
   renderTracks();
 }
-function renderTracks(){const list=document.getElementById("tlist");list.innerHTML="";if(!tracks.length){list.innerHTML='<div class="system-msg">SEM FAIXAS PARA TOCAR</div>';return;}tracks.forEach((t,i)=>{const el=document.createElement("div");el.className="trow";el.dataset.uri=t.uri;el.innerHTML=`<div class="tidx"><span class="tidx-n">${i+1}</span><div class="teq"><div class="teb" style="height:3px"></div><div class="teb" style="height:7px"></div><div class="teb" style="height:2px"></div></div></div><div class="tinfo"><div class="tn"></div><div class="ta"></div></div><div class="td">${ms2t(t.duration_ms)}</div>`;el.querySelector(".tn").textContent=t.name;el.querySelector(".ta").textContent=t.artists.map(a=>a.name).join(", ");el.onclick=()=>playTrack(t.uri,i);list.appendChild(el);});}
+function renderTracks(){const list=document.getElementById("tlist");list.innerHTML="";if(!tracks.length){list.innerHTML='<div class="system-msg">SEM FAIXAS PARA TOCAR</div>';return;}tracks.forEach((t,i)=>{const el=document.createElement("div");el.className="trow";el.dataset.uri=t.uri;el.innerHTML=`<div class="tidx"><span class="tidx-n">${i+1}</span><div class="teq"><div class="teb" style="height:3px"></div><div class="teb" style="height:7px"></div><div class="teb" style="height:2px"></div></div></div><div class="tinfo"><div class="tn"></div><div class="ta"></div></div><div class="td">${ms2t(t.duration_ms)}</div>`;el.querySelector(".tn").textContent=t.name;el.querySelector(".ta").textContent=t.artists.map(a=>a.name).join(", ");el.onclick=()=>playTrack(t.uri,i);list.appendChild(el);});hiTrack(pendingPlayback?.uri||currentTrackUri);}
 async function activateRadioCar(){
-  if(!player||!deviceId){showAuthError("O player RadioCar ainda está iniciando. Aguarde um instante e tente novamente.");return false;}
-  await player.activateElement().catch(()=>{});
-  const transfer=await api("/me/player",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({device_ids:[deviceId],play:false})});
-  if(!transfer||!transfer.ok){showAuthError("Não foi possível ativar o dispositivo RadioCar. Verifique se sua conta é Spotify Premium.");return false;}
-  /* A API confirma a transferência antes de o estado de reprodução existir;
-     uma espera curta é confiável aqui, enquanto consultar /me/player pode
-     devolver 204 e cancelar indevidamente o primeiro play. */
-  await new Promise(resolve=>setTimeout(resolve,500));
-  return true;
+  if(!player)bootSDK();
+  // Wait for SDK readiness only on the first interaction, never on every song.
+  const deadline=Date.now()+6000;
+  while(token&&!deviceId&&Date.now()<deadline)await delay(100);
+  return Boolean(player&&deviceId&&token);
+}
+async function startSpotifyPlayback(body){
+  const start=()=>api(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  let r=await start();
+  if(r?.status===404){
+    const transfer=await api("/me/player",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({device_ids:[deviceId],play:false})});
+    if(!transfer?.ok)return transfer;
+    // Spotify may acknowledge transfer before the device is addressable.
+    for(let attempt=0;attempt<3&&r?.status===404;attempt++){await delay(250*(attempt+1));r=await start();}
+  }
+  return r;
+}
+async function assertPlayback(response){
+  if(response?.ok)return;
+  const detail=await response?.json().catch(()=>null);
+  throw new Error(detail?.error?.message||"Não foi possível iniciar a reprodução. Tente novamente.");
+}
+async function runPlayback(command){
+  if(playbackBusy)return;
+  playbackBusy=true;playbackRevision++;
+  document.getElementById("lcdLbl").textContent="SINTONIZANDO...";
+  showAuthError("");
+  try{await command();}
+  catch(error){pendingPlayback=null;showAuthError(error.message||"Não foi possível controlar o Spotify.");}
+  finally{playbackBusy=false;playbackRevision++;void pollPlayback();}
 }
 async function playTrack(uri,idx){
-  if(!token)return;
+  if(poweredOff||!requireConnection()||playbackBusy)return;
+  const selected=tracks[idx],selectedPlaylist=plId;
+  if(!selected||selected.uri!==uri)return;
+  const activation=player?.activateElement().catch(()=>{});
   showTrackScreen();
-  if(player&&!(await activateRadioCar()))return;
-  activeTrackIndex=idx;
-  const dev=deviceId?`?device_id=${deviceId}`:"";
-  const start=body=>api(`/me/player/play${dev}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  let r;
-  if(plId){
-    r=await start({context_uri:`spotify:playlist:${plId}`,offset:{position:idx}});
-    playbackContext=r?.ok?"playlist":"none";
-  }else{
-    /* A collection context gives Spotify a real queue for liked songs. Unlike
-       a one-track URI request, it can change to the next track without a
-       JavaScript timer running in this tab. Older Spotify clients can reject
-       this context, so retain the single-track request as a safe fallback. */
-    r=await start({context_uri:"spotify:collection:tracks",offset:{position:idx}});
-    if(r?.ok){
-      playbackContext="saved-collection";
+  await runPlayback(async()=>{
+    await activation;
+    if(!await activateRadioCar())throw new Error("O RadioCar ainda está iniciando. Pressione play novamente.");
+    pendingPlayback={uri,playing:true,until:Date.now()+8000};
+    setDisp(selected.name,selected.artists.map(a=>a.name).join(" / "),0,selected.duration_ms);
+    hiTrack(uri);
+    let r;
+    if(selectedPlaylist){
+      r=await startSpotifyPlayback({context_uri:`spotify:playlist:${selectedPlaylist}`,offset:{position:selected.playlistPosition??idx}});
+      if(r?.ok)playbackContext="playlist";
     }else{
-      r=await start({uris:[uri]});
-      playbackContext=r?.ok?"saved-fallback":"none";
+      r=await startSpotifyPlayback({context_uri:"spotify:collection:tracks",offset:{uri}});
+      if(r?.ok)playbackContext="saved-collection";
+      else if(r&&[400,403,404].includes(r.status)){
+        r=await startSpotifyPlayback({uris:[uri]});
+        if(r?.ok)playbackContext="saved-fallback";
+      }
     }
-  }
-  if(!r||!r.ok){
-    const detail=await r?.json().catch(()=>null);
-    const message=detail?.error?.message||"Não foi possível iniciar a reprodução neste dispositivo.";
-    showAuthError(r?.status===404?"O dispositivo RadioCar não está ativo. Tente tocar novamente.":message);
-  }else{
-    showAuthError("");
-  }
+    await assertPlayback(r);
+  });
 }
 function lcdText(value){return String(value??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
 function showTrackScreen(){if(screenMode==="track")return;screenMode="track";renderScreenMode();}
@@ -639,18 +749,59 @@ function setDisp(title,artist,p,d){lastDisplay={title,artist,position:p,duration
 function updProg(){const fill=document.getElementById("progFill");if(!dur){fill.style.width="0%";return;}fill.style.width=`${Math.max(0,Math.min(100,pos/dur*100))}%`;}
 function setStatus(on,txt){document.getElementById("led").className="led"+(on?"":" off");document.querySelector(".lcd")?.classList.toggle("is-playing",Boolean(on));if("mediaSession" in navigator)navigator.mediaSession.playbackState=on?"playing":"paused";if(screenMode==="track")document.getElementById("lcdLbl").textContent=txt;isPlaying=on;}
 function updIco(){const sh=document.getElementById("iShuffle"),rp=document.getElementById("iRepeat");sh.className="ico lcd-mode-icon"+(shuffle?" on":"");rp.className="ico lcd-mode-icon"+(repeat?" on":"");sh.setAttribute("aria-label",shuffle?"Shuffle ativado":"Shuffle desativado");rp.setAttribute("aria-label",repeat?"Repetição ativada":"Repetição desativada");}
-function hiTrack(uri){const found=tracks.findIndex(track=>track.uri===uri);if(found>=0)activeTrackIndex=found;document.querySelectorAll(".trow").forEach(el=>el.classList.toggle("on",el.dataset.uri===uri));}
+function hiTrack(uri){activeTrackIndex=tracks.findIndex(track=>track.uri===uri);document.querySelectorAll(".trow").forEach(el=>el.classList.toggle("on",el.dataset.uri===uri));}
 function checkTrackCompletion(paused,current,duration){
   /* Spotify advances playlists and the liked-songs collection itself. The
      fallback below is solely for clients that do not accept the collection
      context, where we still move through the loaded list. */
-  if(!paused||poweredOff||repeat||plId!==null||playbackContext==="saved-collection"||autoAdvancePending||!duration||current<duration-700)return;
+  if(!paused||poweredOff||repeat||plId!==null||playbackContext!=="saved-fallback"||playbackBusy||pendingPlayback||autoAdvancePending||!duration||current<duration-700)return;
   autoAdvancePending=true;
   setTimeout(async()=>{try{if(tracks.length&&activeTrackIndex>=0){let next=shuffle?Math.floor(Math.random()*tracks.length):(activeTrackIndex+1)%tracks.length;if(tracks.length>1&&next===activeTrackIndex)next=(next+1)%tracks.length;await playTrack(tracks[next].uri,next);}else if(player){await player.nextTrack();}else{await api("/me/player/next",{method:"POST"});}}finally{setTimeout(()=>autoAdvancePending=false,900);}},220);
 }
-async function getState(){if(!token)return null;const r=await api("/me/player");if(!r||r.status===204||!r.ok)return null;return r.json();}
+async function getState(strict=false){if(!token)return null;const r=await api("/me/player");if(r?.status===204)return null;if(!r?.ok){if(strict)throw new Error("Não foi possível consultar a reprodução do Spotify. Tente novamente.");return null;}return r.json();}
+function applyPlaybackState(track,position,duration,playing,shuffled,repeated){
+  if(!token||!track||poweredOff)return;
+  if(pendingPlayback){
+    const matches=track.uri===pendingPlayback.uri&&playing===pendingPlayback.playing;
+    if(!matches&&Date.now()<pendingPlayback.until)return;
+    if(!matches)showAuthError("O Spotify não confirmou a reprodução. Pressione play para tentar novamente.");
+    pendingPlayback=null;
+  }
+  currentTrackUri=track.uri;
+  shuffle=Boolean(shuffled);repeat=Boolean(repeated);
+  setDisp(track.name,(track.artists||[]).map(a=>a.name).join(" / "),position,duration);
+  setStatus(playing,playing?"PLAYING":"PAUSE");hiTrack(track.uri);updIco();
+  checkTrackCompletion(!playing,position,duration);
+}
+function applySDKState(s){
+  if(!s)return;
+  applyPlaybackState(s.track_window?.current_track,s.position,s.duration,!s.paused,s.shuffle,s.repeat_mode===2);
+}
 let pollBusy=false;
-function startPoll(){clearInterval(poll);poll=setInterval(async()=>{if(pollBusy)return;pollBusy=true;try{if(player){const s=await player.getCurrentState().catch(()=>null);if(s){const t=s.track_window.current_track;dur=s.duration;pos=s.position;isPlaying=!s.paused;shuffle=s.shuffle;if(typeof s.repeat_mode==="number")repeat=s.repeat_mode===2;setDisp(t.name,t.artists.map(a=>a.name).join(" / "),s.position,s.duration);setStatus(!s.paused,s.paused?"PAUSE":"PLAYING");hiTrack(t.uri);updIco();checkTrackCompletion(s.paused,s.position,s.duration);return;}if(isPlaying){pos=Math.min(dur,pos+850);updProg();document.getElementById("tCur").textContent=ms2t(pos);if(plId===null&&dur&&pos>=dur)checkTrackCompletion(true,dur,dur);}}else{const s=await getState();if(!s||!s.item)return;dur=s.item.duration_ms;pos=s.progress_ms;setDisp(s.item.name,s.item.artists.map(a=>a.name).join(" / "),s.progress_ms,s.item.duration_ms);setStatus(s.is_playing,s.is_playing?"PLAYING":"PAUSE");hiTrack(s.item.uri);shuffle=s.shuffle_state;if(typeof s.repeat_state==="string")repeat=s.repeat_state==="track";updIco();checkTrackCompletion(!s.is_playing,s.progress_ms,s.item.duration_ms);}}finally{pollBusy=false;}},850);}
+async function pollPlayback(){
+  if(pollBusy||playbackBusy||!token)return;
+  pollBusy=true;
+  const revision=playbackRevision,eventRevision=stateRevision;
+  try{
+    const local=await player?.getCurrentState().catch(()=>null);
+    if(revision!==playbackRevision||eventRevision!==stateRevision)return;
+    if(local){applySDKState(local);return;}
+    // An idle SDK does not describe what is playing on the phone/desktop.
+    if(Date.now()-lastRemotePoll<5000)return;
+    lastRemotePoll=Date.now();
+    const remote=await getState();
+    if(revision!==playbackRevision||eventRevision!==stateRevision)return;
+    if(remote?.item)applyPlaybackState(remote.item,remote.progress_ms,remote.item.duration_ms,remote.is_playing,remote.shuffle_state,remote.repeat_state==="track");
+  }catch{ /* A transient network/SDK failure should not clear the display. */ }
+  finally{
+    pollBusy=false;
+    if(!playbackBusy&&pendingPlayback&&Date.now()>=pendingPlayback.until){
+      pendingPlayback=null;
+      showAuthError("O Spotify não confirmou a reprodução. Pressione play para tentar novamente.");
+    }
+  }
+}
+function startPoll(){clearInterval(poll);lastRemotePoll=0;void pollPlayback();poll=setInterval(pollPlayback,1000);}
 function ms2t(ms){if(!ms)return"0:00";const s=Math.floor(ms/1000);return`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;}
 document.getElementById("knobOvr").addEventListener("wheel",e=>{e.preventDefault();const inp=document.getElementById("volRange");inp.value=Math.max(0,Math.min(100,+inp.value-Math.sign(e.deltaY)*2));onVol(inp.value);},{passive:false});
 const knob=document.getElementById("knobOvr"),volumeInput=document.getElementById("volRange");
