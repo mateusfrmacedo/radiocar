@@ -702,7 +702,7 @@ body.light .tracks-column .trow.on .ta,
 body.light .tracks-column .trow.on .td,
 body.light .tracks-column .trow.on .tidx { color:#4b3b3e; }
 
-/* Physical hit-map — based on buttons/botoes.png.
+/* Physical hit-map — aligned with the radio artwork.
    The transparent overlay follows each molded key, so the pressed recess never
    appears as a generic rectangle over the faceplate. */
 .ovr:not(.o-knob) { overflow:hidden; }
