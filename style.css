@@ -62,7 +62,7 @@ body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:
   pointer-events: none;
   transform-origin: center center;
   transform: rotate(-27deg);
-  transition: transform 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition:transform .68s cubic-bezier(.16,.88,.22,1);
   /* The knob artwork has a different base hue from the radio artwork, so a
      hue rotation produces a shifted colour.  Its illumination is drawn by
      the overlay below using the exact selected accent instead. */
@@ -88,7 +88,13 @@ body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:
 }
 .lcd-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; filter:saturate(.72) contrast(1.18) brightness(.7); mix-blend-mode:screen; pointer-events:none; z-index:1; transition:opacity .35s ease,filter .35s ease; }
 .lcd.show-animation .lcd-video.is-active { opacity:.92; }
-.lcd.show-animation .lcd-inner { opacity:0; visibility:hidden; }
+.lcd-spectrum { position:absolute; inset:0; z-index:2; isolation:isolate; display:flex; align-items:flex-end; gap:.34cqw; padding:.7cqw 1.15cqw .65cqw; overflow:hidden; opacity:0; visibility:hidden; pointer-events:none; background:linear-gradient(180deg,rgba(0,0,0,.16),rgba(0,0,0,.64)),repeating-linear-gradient(0deg,transparent 0 .48cqw,rgba(var(--accent-rgb),.09) .5cqw .56cqw); box-shadow:inset 0 0 1.5cqw rgba(0,0,0,.9); transition:opacity .24s ease,visibility .24s step-end; }
+.lcd-spectrum::before { content:""; position:absolute; z-index:3; inset:0; pointer-events:none; background:linear-gradient(112deg,rgba(255,255,255,.1),transparent 16% 68%,rgba(255,255,255,.025)),repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px); opacity:.72; }
+.lcd-spectrum::after { content:""; position:absolute; z-index:0; inset:0; background:radial-gradient(ellipse at 50% 100%,rgba(var(--accent-rgb),.25),transparent 66%); mix-blend-mode:screen; }
+.lcd-spectrum span { position:relative; z-index:1; flex:1 1 0; min-width:0; height:32%; border-radius:.16cqw .16cqw 0 0; background:repeating-linear-gradient(to top,var(--accent) 0 .26cqw,rgba(var(--accent-rgb),.34) .27cqw .37cqw,transparent .38cqw .54cqw),linear-gradient(to top,rgba(var(--accent-rgb),.25),var(--accent)); box-shadow:0 0 .4cqw rgba(var(--accent-rgb),.52),0 0 1cqw rgba(var(--accent-rgb),.14); transition:height .2s cubic-bezier(.22,.65,.26,1); }
+.lcd.show-spectrum { background:#080303; }
+.lcd.show-spectrum .lcd-spectrum { opacity:1; visibility:visible; }
+.lcd.show-animation .lcd-inner, .lcd.show-spectrum .lcd-inner { opacity:0; visibility:hidden; }
 .lcd-inner { transition:opacity .22s ease,visibility .22s step-end; }
 /* LCD typography and rows scale with the physical radio, avoiding cropped lines on narrow windows. */
 .lcd { padding:.58cqw 1.05cqw .46cqw; }
@@ -197,8 +203,8 @@ body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:
 /* Compact settings control: gear button with a raised, self-contained panel. */
 .settings-menu { position:fixed; left:22px; bottom:18px; z-index:100; display:flex; align-items:center; gap:8px; font-family:"Share Tech Mono",monospace; }
 .settings-trigger { width:34px; height:34px; display:grid; place-items:center; border:1px solid #3d3d3d; border-radius:50%; background:linear-gradient(#404040,#171717); color:#bbb; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.16),inset 0 -2px 3px rgba(0,0,0,.55),0 2px 5px rgba(0,0,0,.5); transition:transform .14s ease,filter .14s ease; }
-.settings-trigger svg { width:18px; height:18px; fill:currentColor; transition:transform .28s ease; }
-.settings-menu.open .settings-trigger svg { transform:rotate(55deg); }
+.settings-trigger img { width:19px; height:19px; object-fit:contain; filter:invert(.8); opacity:.88; transition:transform .28s ease,filter .2s ease; }
+.settings-menu.open .settings-trigger img { transform:rotate(55deg); filter:invert(1); }
 .settings-trigger:active { transform:translateY(1px) scale(.96); filter:brightness(.78); box-shadow:inset 0 2px 5px #000; }
 .settings-spotify { width:34px; height:34px; display:grid; place-items:center; border:1px solid #196b35; border-radius:50%; background:linear-gradient(#32c764,#15843f); color:#071b0e; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.42),inset 0 -2px 3px rgba(0,0,0,.28),0 2px 5px rgba(0,0,0,.5); transition:transform .14s ease,filter .14s ease; }
 .settings-spotify svg { width:20px; height:20px; fill:currentColor; }
@@ -206,6 +212,8 @@ body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:
 .settings-popup { position:absolute; left:0; bottom:44px; width:154px; padding:9px; border:1px solid #3d3d3d; border-radius:8px; background:linear-gradient(145deg,rgba(48,48,48,.98),rgba(14,14,14,.98)); box-shadow:inset 0 1px rgba(255,255,255,.15),0 8px 22px rgba(0,0,0,.55); opacity:0; visibility:hidden; transform:translateY(5px) scale(.96); transform-origin:left bottom; transition:opacity .16s ease,transform .16s ease,visibility .16s step-end; }
 .settings-menu.open .settings-popup { opacity:1; visibility:visible; transform:translateY(0) scale(1); transition:opacity .16s ease,transform .16s ease; }
 .settings-theme { width:100%; display:flex; align-items:center; justify-content:center; border:1px solid #515151; border-radius:5px; background:linear-gradient(#3d3d3d,#202020); color:#aaa; padding:6px 7px; font:inherit; font-size:10px; letter-spacing:1.2px; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.12),inset 0 -1px rgba(0,0,0,.6); }
+.settings-pip,.settings-mic { width:100%; margin-top:7px; border:1px solid #515151; border-radius:5px; background:linear-gradient(#3d3d3d,#202020); color:#e2e2e2; padding:6px 7px; font:10px "Share Tech Mono",monospace; letter-spacing:1.2px; cursor:pointer; box-shadow:inset 0 1px rgba(255,255,255,.12),inset 0 -1px rgba(0,0,0,.6); }
+.settings-pip:active,.settings-mic:active { transform:translateY(1px); box-shadow:inset 0 1px 4px #000; }
 .settings-theme:active { transform:translateY(1px); box-shadow:inset 0 1px 4px #000; }
 .settings-theme strong { color:#e2e2e2; font:inherit; }
 .settings-colors { display:flex; align-items:center; justify-content:space-between; margin-top:9px; color:#888; font-size:10px; letter-spacing:1.2px; }
@@ -213,6 +221,7 @@ body[data-accent="cyan"] { --accent:#20e5e6; --accent-dim:#258f91; --accent-rgb:
 .settings-dots .accent-dot { width:14px; height:14px; flex-basis:14px; }
 body.light .settings-popup { background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(220,220,220,.98)); border-color:#aaa; }
 body.light .settings-theme { background:linear-gradient(#fff,#ddd); border-color:#aaa; color:#555; }
+body.light .settings-pip,body.light .settings-mic { background:linear-gradient(#fff,#ddd); border-color:#aaa; color:#444; }
 body.light .settings-theme strong,body.light .settings-colors { color:#444; }
 /* Connection now lives beside the gear, leaving no duplicate call-to-action below the radio. */
 .pl-panel.auth-mode { display:none; }
@@ -563,12 +572,62 @@ body.light .scale-controls output { color:#444; }
 /* Bluetooth pulses while the Spotify connection flow is being opened. */
 .lcd .lcd-bt-icon.pairing { animation:bt-pairing .7s ease-in-out infinite alternate; }
 @keyframes bt-pairing { from { opacity:.18; filter:drop-shadow(0 0 1px rgba(var(--accent-rgb),.35)); } to { opacity:1; filter:drop-shadow(0 0 3px rgba(var(--accent-rgb),1)) drop-shadow(0 0 8px rgba(var(--accent-rgb),.7)); } }
+.lcd .lcd-bt-icon.on:not(.pairing) { animation:bt-idle-pulse 2.6s ease-in-out infinite; }
+@keyframes bt-idle-pulse { 0%,100% { opacity:.46; } 50% { opacity:1; } }
 
 /* Slightly lower the scrolling song title without losing descender clearance. */
 .lcd .title { top:.36cqw; }
 
 /* Center mode icons on the exact status lane used by PLAYING. */
 .lcd .icons { top:0; height:15%; align-items:center; }
+
+/* A continuous two-part marquee keeps title and artist apart, while the LCD's
+   lower lane reserves room for both time values and the progress bar. */
+.lcd .r2 { overflow:visible; align-items:center; padding:0 .1cqw .15cqw; }
+.lcd .title { top:.65cqw; padding:.14cqw 0 .26cqw; white-space:pre; will-change:transform; }
+.lcd .title.scroll { animation:lcd-marquee 34s linear infinite; }
+.lcd .title.lcd-system-title { top:.65cqw; }
+.lcd .title.scroll.lcd-system-title { animation-duration:26s; }
+.lcd .clock-colon { animation:clock-blink 1s steps(1,end) infinite; }
+@keyframes clock-blink { 0%,48% { opacity:1; } 49%,100% { opacity:.18; } }
+@keyframes lcd-marquee { 0%,10% { transform:translateX(0); } 90%,100% { transform:translateX(-50%); } }
+.lcd .r4 { left:.55cqw; right:.55cqw; bottom:.32cqw; height:1.2cqw; }
+.lcd .time-row { display:grid; grid-template-columns:3.7cqw minmax(0,1fr) 3.7cqw; gap:.5cqw; padding:0; height:100%; align-items:center; }
+.lcd .time-row .prog-track { width:100%; min-width:0; }
+.lcd #tTot { position:static; min-width:0; transform:none; text-align:right; }
+
+/* LCD illumination standard: every active element shares the same digital
+   glow as the central marquee and takes its hue from the selected colour. */
+.lcd {
+  --lcd-text-glow:0 0 7px rgba(var(--accent-rgb),.9),0 0 15px rgba(var(--accent-rgb),.52),0 0 22px rgba(var(--accent-rgb),.18);
+}
+.lcd .title,
+.lcd .lbl,
+.lcd .r3,
+.lcd .time-row,
+.lcd .ico,
+.lcd #tCur,
+.lcd #tTot,
+.lcd .vol-lbl,
+.lcd .vol-num {
+  color:var(--accent);
+  text-shadow:var(--lcd-text-glow);
+}
+.lcd .led:not(.off) {
+  background:var(--accent);
+  box-shadow:var(--lcd-text-glow);
+}
+.lcd .icons svg {
+  color:var(--accent);
+  stroke:currentColor;
+  filter:drop-shadow(0 0 3px rgba(var(--accent-rgb),.9)) drop-shadow(0 0 7px rgba(var(--accent-rgb),.52)) drop-shadow(0 0 11px rgba(var(--accent-rgb),.18));
+}
+.lcd .prog-fill {
+  background:linear-gradient(90deg,var(--accent-dim),var(--accent));
+  box-shadow:0 0 4px rgba(var(--accent-rgb),.9),0 0 8px rgba(var(--accent-rgb),.52),0 0 12px rgba(var(--accent-rgb),.18);
+}
+
+/* PiP refresh is configurable without rebuilding the radio face every tick. */
 
 /* Side-by-side Spotify library: playlists select the tracks on the right. */
 .library-layout { display:grid; grid-template-columns:minmax(190px,.78fr) minmax(0,1.22fr); gap:16px; align-items:start; }
@@ -643,7 +702,7 @@ body.light .tracks-column .trow.on .ta,
 body.light .tracks-column .trow.on .td,
 body.light .tracks-column .trow.on .tidx { color:#4b3b3e; }
 
-/* Physical hit-map — based on buttons/botoes.png.
+/* Physical hit-map — aligned with the radio artwork.
    The transparent overlay follows each molded key, so the pressed recess never
    appears as a generic rectangle over the faceplate. */
 .ovr:not(.o-knob) { overflow:hidden; }
@@ -875,3 +934,40 @@ body.light .tracks-column .trow.on .tidx { color:#4b3b3e; }
 .radio-wrapper.is-powered-off .radio-off-img { opacity:1; }
 .radio-wrapper.is-powered-off::after { display:none; }
 .radio-wrapper.is-powered-off .ovr:not(.o-knob)::before { opacity:0; }
+
+/* Short CRT-style power transition: the LCD wakes through a scan and shuts
+   down into a horizontal phosphor line instead of appearing abruptly. */
+.lcd-power-fx {
+  position:absolute;
+  inset:0;
+  z-index:30;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transform-origin:center;
+  background:radial-gradient(ellipse at center,rgba(var(--accent-rgb),.82),rgba(var(--accent-rgb),.24) 34%,transparent 70%);
+  mix-blend-mode:screen;
+}
+.radio-wrapper.powering-on .lcd-power-fx { visibility:visible; animation:lcd-crt-on .52s cubic-bezier(.18,.72,.18,1) both; }
+.radio-wrapper.powering-off .lcd-power-fx { visibility:visible; animation:lcd-crt-off .42s cubic-bezier(.55,.05,.74,.38) both; }
+.radio-wrapper.powering-on .lcd-inner { visibility:visible; animation:lcd-content-on .52s ease-out both; }
+@keyframes lcd-crt-on {
+  0% { opacity:1; transform:scaleX(.14) scaleY(.025); box-shadow:0 0 .8cqw rgba(var(--accent-rgb),1),0 0 2.4cqw rgba(var(--accent-rgb),.8); }
+  26% { opacity:1; transform:scaleX(1) scaleY(.035); }
+  62% { opacity:.82; transform:scaleX(1) scaleY(.72); }
+  100% { opacity:0; transform:scale(1); box-shadow:0 0 0 transparent; }
+}
+@keyframes lcd-crt-off {
+  0% { opacity:0; transform:scale(1); }
+  28% { opacity:.26; transform:scale(1); }
+  68% { opacity:1; transform:scaleX(1) scaleY(.035); box-shadow:0 0 .7cqw rgba(var(--accent-rgb),1),0 0 2cqw rgba(var(--accent-rgb),.72); }
+  100% { opacity:0; transform:scaleX(.12) scaleY(.02); box-shadow:0 0 0 transparent; }
+}
+@keyframes lcd-content-on {
+  0%,38% { opacity:0; filter:brightness(2.5) blur(.14cqw); }
+  70% { opacity:.9; filter:brightness(1.6) blur(0); }
+  100% { opacity:1; filter:none; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .radio-wrapper.powering-on .lcd-power-fx,.radio-wrapper.powering-off .lcd-power-fx,.radio-wrapper.powering-on .lcd-inner { animation-duration:.01ms; }
+}
